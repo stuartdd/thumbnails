@@ -5,7 +5,7 @@
 *.so
 *.dylib
 *.data
-main
+thumbnails
 
 dstPics/
 srcPics/
