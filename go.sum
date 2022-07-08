@@ -1,0 +1,4 @@
+github.com/liujiawm/graphics-go v0.0.0-20200331105750-879216a3393f h1:lJQL5KVEmHtK7HlwLW3IE3gabnGpybQnCWp/EXBog8M=
+github.com/liujiawm/graphics-go v0.0.0-20200331105750-879216a3393f/go.mod h1:E0n/KirZ2EH6BhBRp+oN6TPeiFmgOMyP6lbM9mHAJjU=
+github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd h1:CmH9+J6ZSsIjUK3dcGsnCnO41eRBOnY12zwkn5qVwgc=
+github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd/go.mod h1:hPqNNc0+uJM6H+SuU8sEs5K5IQeKccPqeSjfgcKGgPk=

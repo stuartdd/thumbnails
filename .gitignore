@@ -5,6 +5,10 @@
 *.so
 *.dylib
 
+main
+
+dstPics/
+srcPics/
 # Test binary, built with `go test -c`
 *.test
 
