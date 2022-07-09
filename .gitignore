@@ -6,6 +6,7 @@
 *.dylib
 *.data
 thumbnails
+gitpush
 
 dstPics/
 srcPics/
