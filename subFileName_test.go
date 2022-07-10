@@ -6,7 +6,7 @@ import (
 )
 
 func TestSubFileName(t *testing.T) {
-	tim, err := time.Parse(TIME_FORMAT, "2020-01-02 09:35:00")
+	tim, err := time.Parse(TIME_FORMAT_1, "2020:01:02 09:35:00")
 	if err != nil {
 		t.FailNow()
 	}
