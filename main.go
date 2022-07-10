@@ -31,6 +31,11 @@ const (
 	TIME_FORMAT_2 = "2006-01-02T15:04:05"
 	TIME_FORMAT_3 = "20060102_150405"
 	NAME_MASK     = "%YYYY_%MM_%DD_%h_%m_%s_%n.%x"
+
+	NC_ARG   = "noclobber"
+	VB_ARG   = "verbose"
+	MASK_ARG = "mask="
+	SIZE_ARG = "size="
 )
 
 func NewPicture(source string) *Picture {
@@ -138,12 +143,13 @@ func main() {
 	if !dstInfo.IsDir() {
 		log.Fatalf("Destination path '%s' must be a directory.", srcPath)
 	}
-	sizeInt, err := findIntArg("size=", 10, 1000, 200)
+	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fileNameMask := findArg("mask=", NAME_MASK)
-	noClobber := findArg("noclobber=", "false")
+	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
+	noClobber := findBoolArg(NC_ARG, true)
+	verbose := findBoolArg(VB_ARG, true)
 
 	filepath.Walk(srcPath, func(inPath string, info fs.FileInfo, errIn error) error {
 		if !info.IsDir() {
@@ -154,13 +160,13 @@ func main() {
 			if err != nil {
 				os.MkdirAll(outPath, os.ModePerm)
 			}
-			thumb(inPath, outPath, fileNameMask, sizeInt, strings.ToLower(noClobber) == "true")
+			thumb(inPath, outPath, fileNameMask, sizeInt, noClobber, verbose)
 		}
 		return nil
 	})
 }
 
-func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber bool) {
+func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbose bool) {
 	pic := NewPicture(srcFile)
 	if pic.err != nil {
 		logError("EXIF  :", srcFile, pic.err)
@@ -183,8 +189,9 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber bool) {
 		logError("DECODE:", srcFile, err)
 		return
 	}
-
-	fmt.Printf("Orientation:%d in:%s: out:%s\n", pic.orientation, srcFile, thumbFileName)
+	if verbose {
+		logError("INFO  :", fmt.Sprintf("Orientation:%d in:%s: out:%s", pic.orientation, srcFile, thumbFileName), nil)
+	}
 
 	b := srcImage.Bounds()
 	var sh int
@@ -244,7 +251,7 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber bool) {
 	}
 	defer newImage.Close()
 
-	err = jpeg.Encode(newImage, dstImage, &jpeg.Options{jpeg.DefaultQuality})
+	err = jpeg.Encode(newImage, dstImage, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	if err != nil {
 		logError("ENCODE:", thumbFileName, err)
 		return
@@ -308,7 +315,7 @@ func logError(tag, file string, err error) {
 	}
 }
 
-func findArg(prefix, def string) string {
+func findStringArg(prefix, def string) string {
 	for _, v := range os.Args {
 		if strings.HasPrefix(v, prefix) {
 			return v[len(prefix):]
@@ -317,8 +324,17 @@ func findArg(prefix, def string) string {
 	return def
 }
 
+func findBoolArg(prefix string, found bool) bool {
+	for _, v := range os.Args {
+		if v == prefix {
+			return found
+		}
+	}
+	return !found
+}
+
 func findIntArg(prefix string, min, max, def int) (int, error) {
-	argStr := findArg(prefix, fmt.Sprintf("%d", def))
+	argStr := findStringArg(prefix, fmt.Sprintf("%d", def))
 	argInt, err := strconv.Atoi(argStr)
 	if err != nil {
 		return 0, fmt.Errorf("error: %s%s argument is invalid %s", prefix, argStr, err.Error())
