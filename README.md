@@ -15,6 +15,7 @@ thumbnails source-path dest-path size=200 mask=%YYYY_%MM_%DD_%h_%m_%s_%n.%x nocl
 | size=N | is the minimum width or height for the thumbnail depending on the aspect ratio | optional = 200 |
 | mask=M | is the format of the file name of the thumbnail created | optional = See below |
 | noclobber=T | if 'true' then existing thumbnails will not be overwritten | optional = false |
+| help | will display the help text | optional = false |
 
 The dest-path is assumed to be empty. All required directories will be created.
 
@@ -38,7 +39,7 @@ The default mask is '%YYYY_%MM_%DD_%h_%m_%s_%n.%x'
 | %m | is a 2 digit minute |
 | %s | is a 2 digit second |
 | %n | is the name of the original file without the suffix (.jpg) |
-| %x | if always 'jpg' whih is the format of the thumbnail file. |
+| %x | if always 'jpg' which is the format of the thumbnail file. |
 
 The time used is derived from the meta data in the original image.
 
@@ -47,3 +48,9 @@ If that is not available then the file name is parsed for a time.
 If that fails then the file system 'modified' time is used.
 
 As a last resort the current date time is used.
+
+## Thanks
+
+ref: https://github.com/rwcarlsen/goexif (rwcarlsen) for the excelelent EXIF library.
+
+ref: https://pkg.go.dev/github.com/liujiawm/graphics-go (liujiawm) for porting the graphics library from the original Google code.

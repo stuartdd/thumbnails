@@ -34,8 +34,11 @@ const (
 
 	NC_ARG   = "noclobber"
 	VB_ARG   = "verbose"
+	HELP_ARG = "help"
 	MASK_ARG = "mask="
 	SIZE_ARG = "size="
+
+	HELP_HINT = ". Use 'help' option to view usage"
 )
 
 func NewPicture(source string) *Picture {
@@ -118,34 +121,37 @@ func timeParseStr(strTime string) (time.Time, error) {
 }
 
 func main() {
+	if findBoolArg(HELP_ARG, true) {
+		exitWithHelp("", 0)
+	}
 	if len(os.Args) < 3 {
-		log.Fatalf("Not enough args [%d]. Requires srcDir destDir. Plus an optional size.\nFor example\n - %s srcdir destdir 200", len(os.Args)-1, os.Args[0])
+		log.Fatalf("Not enough args [%d]%s", len(os.Args)-1, HELP_HINT)
 	}
 	srcPath, err := filepath.Abs(os.Args[1])
 	if err != nil {
-		log.Fatalf("Source path '%s' is invalid %s", os.Args[1], err.Error())
+		log.Fatalf("Source path '%s' is invalid %s%s", os.Args[1], err.Error(), HELP_HINT)
 	}
 	srcInfo, err := os.Stat(srcPath)
 	if err != nil {
-		log.Fatalf("Source path:%s", err.Error()[5:])
+		log.Fatalf("Source path:%s%s", err.Error()[5:], HELP_HINT)
 	}
 	if !srcInfo.IsDir() {
-		log.Fatalf("Source path '%s' must be a directory.", srcPath)
+		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
 	dstPath, err := filepath.Abs(os.Args[2])
 	if err != nil {
-		log.Fatalf("Destination path '%s' is invalid %s", os.Args[2], err.Error())
+		log.Fatalf("Destination path '%s%s' is invalid %s", os.Args[2], err.Error(), HELP_HINT)
 	}
 	dstInfo, err := os.Stat(dstPath)
 	if err != nil {
-		log.Fatalf("Destination path:%s", err.Error()[5:])
+		log.Fatalf("Destination path:%s%s", err.Error()[5:], HELP_HINT)
 	}
 	if !dstInfo.IsDir() {
-		log.Fatalf("Destination path '%s' must be a directory.", srcPath)
+		log.Fatalf("Destination path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
 	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
 	}
 	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
 	noClobber := findBoolArg(NC_ARG, true)
@@ -189,9 +195,17 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 		logError("DECODE:", srcFile, err)
 		return
 	}
-	if verbose {
-		logError("INFO  :", fmt.Sprintf("Orientation:%d in:%s: out:%s", pic.orientation, srcFile, thumbFileName), nil)
-	}
+
+	// b := srcImage.Bounds()
+	// var sh int
+	// var sw int
+	// if b.Dx() > b.Dy() {
+	// 	sw = size
+	// 	sh = int(float64(sw) * (float64(b.Dy()) / float64(b.Dx())))
+	// } else {
+	// 	sh = size
+	// 	sw = int(float64(sh) * (float64(b.Dx()) / float64(b.Dy())))
+	// }
 
 	b := srcImage.Bounds()
 	var sh int
@@ -202,6 +216,10 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 	} else {
 		sw = size
 		sh = int(float64(sw) * (float64(b.Dy()) / float64(b.Dx())))
+	}
+
+	if verbose {
+		logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, srcFile, thumbFileName), nil)
 	}
 
 	dstImage := image.NewRGBA(image.Rect(0, 0, sw, sh))
@@ -346,4 +364,63 @@ func findIntArg(prefix string, min, max, def int) (int, error) {
 		return 0, fmt.Errorf("error: %s%s argument is more than %d", prefix, argStr, max)
 	}
 	return argInt, nil
+}
+
+func exitWithHelp(s string, rc int) {
+	help := []byte(`
+Usage:
+	%{app} <src-dir> <dest-dir> [options]
+Function: 
+	Recursivly walk <src-dir> creating <dest-dir> with the same directory structure.
+	Convert all '.jpg' and '.png' files to thumbnails in the <dest-dir>.
+		All thumbnails are created as '.jpg' files.
+
+	<src-dir>: is the root directory with the original pictures in it.
+	<dest-dir>: is the root of the directory containing the thumbnails.
+
+Options:
+	size=n: This is the size of the thumbnail width or height depending on the originals aspect ratio.
+	Default = 200. Min = 10. Max = 1000.
+
+	If height > width then size will be the width. Aspect ratio is maintained.
+	If width > height then size will be the height. Aspect ratio is maintained.
+	
+	All thumbnails will be rotated according to the EXIF Orientation meta data field if available.
+
+	mask=<filename-mask>: This is the file name mask used to generate the name of the thumbnail.
+	Default value is '%YYYY_%MM_%DD_%h_%m_%s_%n.%x'. This sorts file names in date time order.
+
+	Value	Desc
+	%YYYY	is a 4 digit year
+	%MM	is a 2 digit month
+	%DD	is a 2 digit day of month
+	%h	is a 2 digit hour in 24 hour format
+	%m	is a 2 digit minute
+	%s	is a 2 digit second
+	%n	is the name of the original file without the suffix (.jpg)
+		For an image file ~/Pictures/myPic.jpg, %n is 'myPic'
+	%x	is always 'jpg' which is the format of the thumbnail file.
+	
+	The time used is derived from the EXIF DateTimeOriginal meta data in the original image.
+	If that is not available then the file name is parsed (format "20060102_150405.jpg") for a date time.
+	If that fails then the file system 'modified' date time is used.
+	As a last resort the current date time is used.
+
+	noclobber: Will not overrwrite existing thumbnail files with the same file name.
+	Default = clobber
+
+	verbose: Will echo the conversion of each file to the console in addition to errors.
+	Default = not verbose
+
+	help: Echo this help text and exit the application with return code 0
+
+Thanks:
+	https://github.com/rwcarlsen/goexif (rwcarlsen) for the excelelent EXIF library. 
+	https://pkg.go.dev/github.com/liujiawm/graphics-go (liujiawm) for porting the graphics library from the original Google code.
+`)
+	if s != "" {
+		fmt.Printf("Error: %s", s)
+	}
+	fmt.Println(strings.ReplaceAll(string(help), "%{app}", os.Args[0]))
+	os.Exit(rc)
 }
