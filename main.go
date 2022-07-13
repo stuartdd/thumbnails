@@ -32,11 +32,12 @@ const (
 	TIME_FORMAT_3 = "20060102_150405"
 	NAME_MASK     = "%YYYY_%MM_%DD_%h_%m_%s_%n.%x"
 
-	NC_ARG   = "noclobber"
-	VB_ARG   = "verbose"
-	HELP_ARG = "help"
-	MASK_ARG = "mask="
-	SIZE_ARG = "size="
+	NC_ARG     = "noclobber"
+	VB_ARG     = "verbose"
+	HELP_ARG   = "help"
+	MASK_ARG   = "mask="
+	SIZE_ARG   = "size="
+	SERVER_ARG = "server="
 
 	HELP_HINT = ". Use 'help' option to view usage"
 )
@@ -138,6 +139,16 @@ func main() {
 	if !srcInfo.IsDir() {
 		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
+	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
+	if err != nil {
+		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
+	}
+	verbose := findBoolArg(VB_ARG, true)
+	server := findStringArg(SERVER_ARG, "")
+	if server != "" {
+		go ThumbnailServer(server, srcPath,)
+	}
+
 	dstPath, err := filepath.Abs(os.Args[2])
 	if err != nil {
 		log.Fatalf("Destination path '%s%s' is invalid %s", os.Args[2], err.Error(), HELP_HINT)
@@ -149,13 +160,10 @@ func main() {
 	if !dstInfo.IsDir() {
 		log.Fatalf("Destination path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
-	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
-	if err != nil {
-		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
-	}
+
+
 	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
 	noClobber := findBoolArg(NC_ARG, true)
-	verbose := findBoolArg(VB_ARG, true)
 
 	filepath.Walk(srcPath, func(inPath string, info fs.FileInfo, errIn error) error {
 		if !info.IsDir() {
