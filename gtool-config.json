@@ -1,0 +1,86 @@
+{
+    "config": {
+        "debugFile": "",
+        "localValues": {
+            "serverport": {
+                "desc": "Server port",
+                "value": "8090"
+            },
+            "serverpath": {
+                "desc": "Server URL",
+                "value": "http://localhost"
+            }
+        }
+    },
+    "actions": [
+        {
+            "tab": "Test Server" ,
+            "name": "Start X",
+            "desc": "Build and Start Server --> %{serverpath}:%{serverport}",
+            "list": [
+                {
+                    "cmd": "go",
+                    "args": [
+                        "run",
+                        ".",
+                        "srcPics",
+                        "serverport=%{serverport}",
+                        "verbose"
+                    ]
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Close",
+            "desc": "Close the Server --> %{serverpath}:%{serverport}",
+            "list": [
+                {
+                    "cmd": "wget",
+                    "args": ["%{serverpath}:%{serverport}/control/close"]
+                },
+                {
+                    "cmd": "cat",
+                    "args": ["close"]
+                },
+                {
+                    "cmd": "rm",
+                    "args": ["close"],
+                    "ignoreError":true
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get Full Image",
+            "desc": "2007-05-27_Brixham/P1010379.JPG",
+            "list": [
+                {
+                    "cmd": "rm",
+                    "args": ["P1010379.JPG"],
+                    "ignoreError":true
+                },
+                {
+                    "cmd": "wget",
+                    "args": ["%{serverpath}:%{serverport}/image/full/2007-05-27_Brixham/P1010379.JPG"]
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get Thunbnail Image",
+            "desc": "2007-05-27_Brixham/P1010379.JPG",
+            "list": [
+                {
+                    "cmd": "rm",
+                    "args": ["P1010379.JPG"],
+                    "ignoreError":true
+                },
+                {
+                    "cmd": "wget",
+                    "args": ["%{serverpath}:%{serverport}/image/200/2007-05-27_Brixham/P1010379.JPG"]
+                }
+            ]
+        }
+    ]
+}

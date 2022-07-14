@@ -7,6 +7,7 @@ import (
 	_ "image/png"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 type Picture struct {
 	source      string
 	name        string
+	ext         string
 	orientation int
 	err         error
 	time        time.Time
@@ -44,12 +46,12 @@ const (
 
 func NewPicture(source string) *Picture {
 	_, fName := filepath.Split(source)
-	ext := filepath.Ext(fName)
+	ext := filepath.Ext(strings.ToLower(fName))
 	name := fName[0 : len(fName)-len(ext)]
 
 	stat, err := os.Stat(source)
 	if err != nil {
-		return &Picture{source: source, name: name, orientation: 1, modTime: time.Now(), time: time.Now(), err: err}
+		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: time.Now(), time: time.Now(), err: err}
 	}
 	modTime := stat.ModTime()
 	picTime, err := timeParseStr(name)
@@ -59,20 +61,20 @@ func NewPicture(source string) *Picture {
 
 	f, err := os.Open(source)
 	if err != nil {
-		return &Picture{source: source, name: name, orientation: 1, modTime: modTime, time: picTime, err: err}
+		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 	defer f.Close()
 	x, err := exif.Decode(f)
 	if err != nil {
-		return &Picture{source: source, name: name, orientation: 1, modTime: modTime, time: picTime, err: err}
+		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 	i, err := x.Get(exif.Orientation)
 	if err != nil {
-		return &Picture{source: source, name: name, orientation: 1, modTime: modTime, time: picTime, err: err}
+		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 	iv, err := i.Int(0)
 	if err != nil {
-		return &Picture{source: source, name: name, orientation: 1, modTime: modTime, time: picTime, err: err}
+		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 
 	t, err := timeParseX(x, exif.DateTimeOriginal)
@@ -88,7 +90,7 @@ func NewPicture(source string) *Picture {
 			}
 		}
 	}
-	return &Picture{source: source, name: name, orientation: iv, modTime: modTime, time: t, err: nil}
+	return &Picture{source: source, name: name, ext: ext, orientation: iv, modTime: modTime, time: t, err: nil}
 }
 
 func timeParseX(ex *exif.Exif, field exif.FieldName) (time.Time, error) {
@@ -139,18 +141,27 @@ func main() {
 	if !srcInfo.IsDir() {
 		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
+	verbose := findBoolArg(VB_ARG, true)
+	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
+	if serverPort > -1 {
+		tns := NewTnServer(serverPort, srcPath, verbose)
+		err := tns.Run()
+		if err != nil {
+			if err != http.ErrServerClosed {
+				log.Fatal("Server Error: " + err.Error())
+			} else {
+				if verbose {
+					log.Println("Server Closed:")
+				}
+			}
+		}
+		os.Exit(0)
+	}
+
 	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
 	if err != nil {
 		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
 	}
-	verbose := findBoolArg(VB_ARG, true)
-	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
-	if serverPort > -1 {
-		tns := NewTnServer(serverPort, srcPath)
-		tns.Run()
-		os.Exit(0)
-	}
-
 	dstPath, err := filepath.Abs(os.Args[2])
 	if err != nil {
 		log.Fatalf("Destination path '%s%s' is invalid %s", os.Args[2], err.Error(), HELP_HINT)
@@ -181,41 +192,18 @@ func main() {
 	})
 }
 
-func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbose bool) {
-	pic := NewPicture(srcFile)
-	if pic.err != nil {
-		logError("EXIF  :", srcFile, pic.err)
-	}
-	thumbFileName := fmt.Sprintf("%s%c%s", thumbPath, filepath.Separator, subFileName(pic.time, thumbNameMask, pic.name, "jpg"))
-	if noClobber {
-		_, err := os.Stat(thumbFileName)
-		if err == nil {
-			return
-		}
-	}
-	imagePath, err := os.Open(srcFile)
+func createThumbImage(pic *Picture, thumbName string, size int, verbose bool) (*image.RGBA, error) {
+	imagePath, err := os.Open(pic.source)
 	if err != nil {
-		logError("OPEN:  ", srcFile, err)
-		return
+		logError("OPEN:  ", pic.source, err)
+		return nil, err
 	}
 	defer imagePath.Close()
 	srcImage, _, err := image.Decode(imagePath)
 	if err != nil {
-		logError("DECODE:", srcFile, err)
-		return
+		logError("DECODE:", pic.source, err)
+		return nil, err
 	}
-
-	// b := srcImage.Bounds()
-	// var sh int
-	// var sw int
-	// if b.Dx() > b.Dy() {
-	// 	sw = size
-	// 	sh = int(float64(sw) * (float64(b.Dy()) / float64(b.Dx())))
-	// } else {
-	// 	sh = size
-	// 	sw = int(float64(sh) * (float64(b.Dx()) / float64(b.Dy())))
-	// }
-
 	b := srcImage.Bounds()
 	var sh int
 	var sw int
@@ -228,14 +216,14 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 	}
 
 	if verbose {
-		logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, srcFile, thumbFileName), nil)
+		logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
 	}
 
 	dstImage := image.NewRGBA(image.Rect(0, 0, sw, sh))
 	err = graphics.Thumbnail(dstImage, srcImage)
 	if err != nil {
-		logError("THUMB :", srcFile, err)
-		return
+		logError("THUMB :", pic.source, err)
+		return nil, err
 	}
 
 	if pic.orientation != 1 {
@@ -248,7 +236,7 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 			rotImage := image.NewRGBA(image.Rect(0, 0, sh, sw))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 1.5708}) // 90
 			if rotErr != nil {
-				logError("ROTATE:  90:", srcFile, rotErr)
+				logError("ROTATE:  90:", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
@@ -256,7 +244,7 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 			rotImage := image.NewRGBA(image.Rect(0, 0, sw, sh))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 3.14159}) // 180
 			if rotErr != nil {
-				logError("ROTATE: 180:", srcFile, rotErr)
+				logError("ROTATE: 180:", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
@@ -264,11 +252,31 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 			rotImage := image.NewRGBA(image.Rect(0, 0, sh, sw))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 4.71239}) // 270
 			if rotErr != nil {
-				logError("ROTATE: 270:", srcFile, rotErr)
+				logError("ROTATE: 270:", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
 		}
+	}
+	return dstImage, nil
+}
+
+func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbose bool) {
+	pic := NewPicture(srcFile)
+	if pic.err != nil {
+		logError("EXIF  :", srcFile, pic.err)
+	}
+	thumbFileName := fmt.Sprintf("%s%c%s", thumbPath, filepath.Separator, subFileName(pic.time, thumbNameMask, pic.name, "jpg"))
+	if noClobber {
+		_, err := os.Stat(thumbFileName)
+		if err == nil {
+			return
+		}
+	}
+
+	dstImage, err := createThumbImage(pic, thumbFileName, size, verbose)
+	if err != nil {
+		return
 	}
 
 	newImage, err := os.Create(thumbFileName)
