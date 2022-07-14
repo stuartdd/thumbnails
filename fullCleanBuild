@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo CLEANING MOD-CACHE
+go clean -modcache
+
+echo CLEANING CACHE
+go clean -cache
+
+echo BUILDING
+go build

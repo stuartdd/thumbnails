@@ -9,8 +9,8 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "main.go",
-            "args": ["srcPics", "dstPics", "size=200", "verbose"]
+            "program": ".",
+            "args": ["srcPics", "serverport=8090", "size=200", "verbose"]
         }
     ]
 }

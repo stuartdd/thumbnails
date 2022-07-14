@@ -32,12 +32,12 @@ const (
 	TIME_FORMAT_3 = "20060102_150405"
 	NAME_MASK     = "%YYYY_%MM_%DD_%h_%m_%s_%n.%x"
 
-	NC_ARG     = "noclobber"
-	VB_ARG     = "verbose"
-	HELP_ARG   = "help"
-	MASK_ARG   = "mask="
-	SIZE_ARG   = "size="
-	SERVER_ARG = "server="
+	NC_ARG          = "noclobber"
+	VB_ARG          = "verbose"
+	HELP_ARG        = "help"
+	MASK_ARG        = "mask="
+	SIZE_ARG        = "size="
+	SERVER_PORT_ARG = "serverport="
 
 	HELP_HINT = ". Use 'help' option to view usage"
 )
@@ -144,9 +144,11 @@ func main() {
 		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
 	}
 	verbose := findBoolArg(VB_ARG, true)
-	server := findStringArg(SERVER_ARG, "")
-	if server != "" {
-		go ThumbnailServer(server, srcPath,)
+	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
+	if serverPort > -1 {
+		tns := NewTnServer(serverPort, srcPath)
+		tns.Run()
+		os.Exit(0)
 	}
 
 	dstPath, err := filepath.Abs(os.Args[2])
@@ -160,7 +162,6 @@ func main() {
 	if !dstInfo.IsDir() {
 		log.Fatalf("Destination path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
-
 
 	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
 	noClobber := findBoolArg(NC_ARG, true)
