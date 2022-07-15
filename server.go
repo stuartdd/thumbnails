@@ -35,45 +35,18 @@ var (
 	}
 )
 
-type EncodedWriter struct {
-	bytes []byte
-	pos   int
-	ext   int
-	size  int
-}
-
-func NewEncodedWriter(ext int) *EncodedWriter {
-	if ext < 2 {
-		panic("Encoded Writer extension must be more than 1")
-	}
-	b := make([]byte, ext)
-	return &EncodedWriter{bytes: b, pos: 0, ext: ext, size: len(b)}
-}
-
-func (ew *EncodedWriter) Bytes() []byte {
-	return ew.bytes[0:ew.pos]
-}
-
-func (ew *EncodedWriter) Write(p []byte) (n int, err error) {
-	pos := ew.pos
-	for _, b := range p {
-		if pos >= ew.size {
-			ew.bytes = append(ew.bytes, make([]byte, ew.ext)...)
-			ew.size = len(ew.bytes)
-		}
-		ew.bytes[pos] = b
-		pos++
-	}
-	ew.pos = pos
-	return len(p), nil
-}
-
 type TNServer struct {
 	port      int
 	server    *http.Server
 	getRoutes map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp
 	srcPath   string
 	verbose   bool
+}
+
+func fileSystemHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
+	if uri[0] == "tree" {
+	}
+	return NF
 }
 
 func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
@@ -159,6 +132,7 @@ func NewTnServer(port int, srcPath string, verbose bool) *TNServer {
 	}
 	tns.AddGetHandler("control", controlHandler)
 	tns.AddGetHandler("image", imageHandler)
+	tns.AddGetHandler("files", fileSystemHandler)
 	tns.server = srv
 	if verbose {
 		log.Printf("Created server: port:%d, src:%s", port, srcPath)
