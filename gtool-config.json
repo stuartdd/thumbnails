@@ -14,7 +14,7 @@
     },
     "actions": [
         {
-            "tab": "Test Server" ,
+            "tab": "Test Server",
             "name": "Start X",
             "desc": "Build and Start Server --> %{serverpath}:%{serverport}",
             "list": [
@@ -37,16 +37,22 @@
             "list": [
                 {
                     "cmd": "wget",
-                    "args": ["%{serverpath}:%{serverport}/control/close"]
+                    "args": [
+                        "%{serverpath}:%{serverport}/control/close"
+                    ]
                 },
                 {
                     "cmd": "cat",
-                    "args": ["close"]
+                    "args": [
+                        "close"
+                    ]
                 },
                 {
                     "cmd": "rm",
-                    "args": ["close"],
-                    "ignoreError":true
+                    "args": [
+                        "close"
+                    ],
+                    "ignoreError": true
                 }
             ]
         },
@@ -57,12 +63,18 @@
             "list": [
                 {
                     "cmd": "rm",
-                    "args": ["P1010379.JPG"],
-                    "ignoreError":true
+                    "args": [
+                        "P1010379.JPG"
+                    ],
+                    "ignoreError": true
                 },
                 {
                     "cmd": "wget",
-                    "args": ["%{serverpath}:%{serverport}/image/full/2007-05-27_Brixham/P1010379.JPG"]
+                    "args": [
+                        "-O",
+                        "full.jpg",
+                        "%{serverpath}:%{serverport}/image/full/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
+                    ]
                 }
             ]
         },
@@ -73,12 +85,18 @@
             "list": [
                 {
                     "cmd": "rm",
-                    "args": ["P1010379.JPG"],
-                    "ignoreError":true
+                    "args": [
+                        "P1010379.JPG"
+                    ],
+                    "ignoreError": true
                 },
                 {
                     "cmd": "wget",
-                    "args": ["%{serverpath}:%{serverport}/image/200/2007-05-27_Brixham/P1010379.JPG"]
+                    "args": [
+                        "-O",
+                        "tn.jpg",
+                        "%{serverpath}:%{serverport}/image/200/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
+                    ]
                 }
             ]
         },
@@ -90,18 +108,59 @@
                 {
                     "cmd": "clear",
                     "args": []
-                },{
+                },
+                {
                     "cmd": "rm",
-                    "args": ["tree"],
-                    "ignoreError":true
+                    "args": [
+                        "dirs.data"
+                    ],
+                    "ignoreError": true
                 },
                 {
                     "cmd": "wget",
-                    "args": ["%{serverpath}:%{serverport}/files/tree"]
+                    "args": [
+                        "-O",
+                        "dirs.data",
+                        "%{serverpath}:%{serverport}/files/tree"
+                    ]
                 },
                 {
                     "cmd": "cat",
-                    "args": ["tree"]
+                    "args": [
+                        "dirs.data"
+                    ]
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get Files",
+            "desc": "List files",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "rm",
+                    "args": [
+                        "files.data"
+                    ],
+                    "ignoreError": true
+                },
+                {
+                    "cmd": "wget",
+                    "args": [
+                        "-O",
+                        "files.data",
+                        "%{serverpath}:%{serverport}/files/list/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden"
+                    ]
+                },
+                {
+                    "cmd": "cat",
+                    "args": [
+                        "files.data"
+                    ]
                 }
             ]
         }

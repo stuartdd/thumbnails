@@ -68,22 +68,8 @@ type TNServer struct {
 	verbose   bool
 }
 
-func filesOfInterest(path string) int {
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		return 0
-	}
-	count := 0
-	for _, f := range files {
-		_, ok := FILE_TYPES[strings.ToLower(filepath.Ext(f.Name()))]
-		if ok {
-			count++
-		}
-	}
-	return count
-}
-
 func fileSystemHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
+
 	if uri[0] == "tree" {
 		var sb strings.Builder
 		count := 0
@@ -92,9 +78,8 @@ func fileSystemHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *ht
 		fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 			if d.IsDir() && p != "." {
 				fp := fmt.Sprintf("%s%c%s", tns.srcPath, os.PathSeparator, p)
-				if filesOfInterest(fp) > 0 {
-					encodedPathVar := url.PathEscape(fp)
-					sb.WriteString(fmt.Sprintf("\n  \"%s\",", encodedPathVar))
+				if len(filesOfInterest(fp)) > 0 {
+					sb.WriteString(fmt.Sprintf("\n  \"%s\",", url.PathEscape(p+"/")))
 					count++
 				}
 			}
@@ -106,25 +91,46 @@ func fileSystemHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *ht
 		}
 		return &TNResp{returnCode: http.StatusOK, mimeType: MEDIA_JSON, resp: []byte(s + "\n]")}
 	}
+
+	if len(uri) < 2 {
+		return BR("FILE", "Not enough data", uri, nil)
+	}
+
+	unEscapedPathVar, err := url.PathUnescape(uri[1])
+	if err != nil {
+		return BR("FILE", "Malformed path", uri, err)
+	}
+
+	if uri[0] == "list" {
+		path := fmt.Sprintf("%s%c%s", tns.srcPath, os.PathSeparator, unEscapedPathVar)
+		list := filesOfInterest(path)
+
+		var sb strings.Builder
+		count := 0
+		sb.WriteString("[")
+		for _, f := range list {
+			sb.WriteString(fmt.Sprintf("\n  \"%s\",", url.PathEscape(f)))
+			count++
+		}
+		s := sb.String()
+		if count > 0 {
+			s = s[:len(s)-1]
+		}
+		return &TNResp{returnCode: http.StatusOK, mimeType: MEDIA_JSON, resp: []byte(s + "\n]")}
+	}
 	return NF("FILE", uri, nil)
 }
 
-func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
-	if uri[0] == "close" {
-		go func() {
-			time.Sleep(2 * time.Second)
-			tns.Close()
-		}()
-		if tns.verbose {
-			log.Printf("Stop server requested: port:%d", tns.port)
-		}
-		return CLOSED
-	}
-	return NF("CNTL", uri, nil)
-}
-
 func imageHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
-	srcFile := tns.convertToPath(uri[1:])
+	if len(uri) < 2 {
+		return BR("IMAGE", "Not enough data", uri, nil)
+	}
+	unEscapedPathVar, err := url.PathUnescape(uri[1])
+	if err != nil {
+		return BR("IMAGE", "Malformed path", uri, err)
+	}
+
+	srcFile := fmt.Sprintf("%s%c%s", tns.srcPath, os.PathSeparator, unEscapedPathVar)
 	if uri[0] == "full" {
 		pic := NewPicture(srcFile, false)
 		if pic.err != nil {
@@ -140,7 +146,6 @@ func imageHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Re
 		}
 		return &TNResp{returnCode: http.StatusOK, mimeType: mt, resp: b}
 	} else {
-
 		pic := NewPicture(srcFile, true)
 		if pic.err != nil {
 			return UMT("IMAGE", pic.GetFileName(), uri, pic.err)
@@ -166,6 +171,20 @@ func imageHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Re
 		}
 		return &TNResp{returnCode: http.StatusOK, mimeType: FILE_TYPES[".jpg"], resp: w.Bytes()}
 	}
+}
+
+func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
+	if uri[0] == "close" {
+		go func() {
+			time.Sleep(2 * time.Second)
+			tns.Close()
+		}()
+		if tns.verbose {
+			log.Printf("Stop server requested: port:%d", tns.port)
+		}
+		return CLOSED
+	}
+	return NF("CNTL", uri, nil)
 }
 
 func NewTnServer(port int, srcPath string, verbose bool) *TNServer {
@@ -214,19 +233,6 @@ func (s *TNServer) AddGetHandler(uri string, handle func([]string, *TNServer, ht
 	s.getRoutes[uri] = handle
 }
 
-func (s *TNServer) convertToPath(uri []string) string {
-	var sb strings.Builder
-	sb.WriteString(s.srcPath)
-	sb.WriteRune(os.PathSeparator)
-	for i, p := range uri {
-		sb.WriteString(p)
-		if i < (len(uri) - 1) {
-			sb.WriteRune(os.PathSeparator)
-		}
-	}
-	return sb.String()
-}
-
 func (s *TNServer) Close() {
 	if s.verbose {
 		log.Printf("Stopping server: port:%d", s.port)
@@ -239,4 +245,19 @@ func (s *TNServer) Run() error {
 		log.Printf("Starting server: port:%d", s.port)
 	}
 	return s.server.ListenAndServe()
+}
+
+func filesOfInterest(path string) []string {
+	list := make([]string, 0)
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return list
+	}
+	for _, f := range files {
+		_, ok := FILE_TYPES[strings.ToLower(filepath.Ext(f.Name()))]
+		if ok {
+			list = append(list, f.Name())
+		}
+	}
+	return list
 }
