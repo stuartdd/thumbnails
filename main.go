@@ -44,7 +44,7 @@ const (
 	HELP_HINT = ". Use 'help' option to view usage"
 )
 
-func NewPicture(source string) *Picture {
+func NewPicture(source string, loadExif bool) *Picture {
 	_, fName := filepath.Split(source)
 	ext := filepath.Ext(strings.ToLower(fName))
 	name := fName[0 : len(fName)-len(ext)]
@@ -64,33 +64,40 @@ func NewPicture(source string) *Picture {
 		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 	defer f.Close()
-	x, err := exif.Decode(f)
-	if err != nil {
-		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
-	}
-	i, err := x.Get(exif.Orientation)
-	if err != nil {
-		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
-	}
-	iv, err := i.Int(0)
-	if err != nil {
-		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
-	}
-
-	t, err := timeParseX(x, exif.DateTimeOriginal)
-	if err != nil {
-		t, err = timeParseX(x, exif.DateTimeDigitized)
+	if loadExif {
+		x, err := exif.Decode(f)
 		if err != nil {
-			t, err = timeParseX(x, exif.DateTime)
+			return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
+		}
+		i, err := x.Get(exif.Orientation)
+		if err != nil {
+			return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
+		}
+		iv, err := i.Int(0)
+		if err != nil {
+			return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
+		}
+
+		t, err := timeParseX(x, exif.DateTimeOriginal)
+		if err != nil {
+			t, err = timeParseX(x, exif.DateTimeDigitized)
 			if err != nil {
-				t, err = timeParseStr(name)
+				t, err = timeParseX(x, exif.DateTime)
 				if err != nil {
-					t = modTime
+					t, err = timeParseStr(name)
+					if err != nil {
+						t = modTime
+					}
 				}
 			}
 		}
+		return &Picture{source: source, name: name, ext: ext, orientation: iv, modTime: modTime, time: t, err: nil}
 	}
-	return &Picture{source: source, name: name, ext: ext, orientation: iv, modTime: modTime, time: t, err: nil}
+	return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: modTime, err: nil}
+}
+
+func (p *Picture) GetFileName() string {
+	return p.name + p.ext
 }
 
 func timeParseX(ex *exif.Exif, field exif.FieldName) (time.Time, error) {
@@ -262,7 +269,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool) (*
 }
 
 func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbose bool) {
-	pic := NewPicture(srcFile)
+	pic := NewPicture(srcFile, true)
 	if pic.err != nil {
 		logError("EXIF  :", srcFile, pic.err)
 	}

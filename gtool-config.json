@@ -81,6 +81,29 @@
                     "args": ["%{serverpath}:%{serverport}/image/200/2007-05-27_Brixham/P1010379.JPG"]
                 }
             ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get Dir",
+            "desc": "List directories",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },{
+                    "cmd": "rm",
+                    "args": ["tree"],
+                    "ignoreError":true
+                },
+                {
+                    "cmd": "wget",
+                    "args": ["%{serverpath}:%{serverport}/files/tree"]
+                },
+                {
+                    "cmd": "cat",
+                    "args": ["tree"]
+                }
+            ]
         }
     ]
 }
