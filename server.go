@@ -41,22 +41,22 @@ var (
 )
 
 func UMT(tag, ent string, uri []string, err error) *TNResp {
-	logError(tag, strings.Join(uri, "/"), err)
+	logError(fmt.Sprintf("UnsupportedMediaType:%s:", tag), strings.Join(uri, "/"), err)
 	return &TNResp{returnCode: http.StatusUnsupportedMediaType, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Unsupported Media Type\", \"Entity\": \"%s\"\"}", ent))}
 }
 
 func ISE(tag, ent string, uri []string, err error) *TNResp {
-	logError(tag, strings.Join(uri, "/"), err)
+	logError(fmt.Sprintf("InternalServerError:%s:", tag), strings.Join(uri, "/"), err)
 	return &TNResp{returnCode: http.StatusInternalServerError, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Internal Server Error\", \"Entity\": \"%s\"\"}", ent))}
 }
 
 func NF(tag string, uri []string, err error) *TNResp {
-	logError(tag, strings.Join(uri, "/"), err)
+	logError(fmt.Sprintf("NotFound:%s:", tag), strings.Join(uri, "/"), err)
 	return &TNResp{returnCode: http.StatusNotFound, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Not Found\", \"URI\": \"%s\"\"}", strings.Join(uri, "/")))}
 }
 
 func BR(tag, ent string, uri []string, err error) *TNResp {
-	logError(tag, strings.Join(uri, "/"), err)
+	logError(fmt.Sprintf("BadRequest:%s:", tag), strings.Join(uri, "/"), err)
 	return &TNResp{returnCode: http.StatusBadRequest, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Bad Request\", \"Value\": \"%s\"\"}", ent))}
 }
 
@@ -156,7 +156,6 @@ func imageHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Re
 			return BR("IMAGE", fmt.Sprintf("size '%s' is invalid", uri[0]), uri, err)
 		}
 		if si < 10 {
-			logError("Invalid thunbnail size (less than 10):", fmt.Sprintf("Value:%s URI:%s", uri[0], strings.Join(uri, "/")), err)
 			return BR("IMAGE", fmt.Sprintf("size '%s' below 10", uri[0]), uri, err)
 		}
 

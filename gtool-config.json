@@ -1,6 +1,5 @@
 {
     "config": {
-        "debugFile": "",
         "localValues": {
             "serverport": {
                 "desc": "Server port",
@@ -32,47 +31,42 @@
         },
         {
             "tab": "Test Server",
+            "name": "Clear",
+            "desc": "Clear test data",
+            "list": [
+                {
+                    "cmd": "rm",
+                    "args": [
+                        "test_*"
+                    ]
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
             "name": "Close",
             "desc": "Close the Server --> %{serverpath}:%{serverport}",
             "list": [
                 {
                     "cmd": "wget",
                     "args": [
+                        "-O",
+                        "test_close.data",
                         "%{serverpath}:%{serverport}/control/close"
                     ]
-                },
-                {
-                    "cmd": "cat",
-                    "args": [
-                        "close"
-                    ]
-                },
-                {
-                    "cmd": "rm",
-                    "args": [
-                        "close"
-                    ],
-                    "ignoreError": true
                 }
             ]
         },
         {
             "tab": "Test Server",
             "name": "Get Full Image",
-            "desc": "2007-05-27_Brixham/P1010379.JPG",
+            "desc": "20120721_191041.jpg",
             "list": [
-                {
-                    "cmd": "rm",
-                    "args": [
-                        "P1010379.JPG"
-                    ],
-                    "ignoreError": true
-                },
                 {
                     "cmd": "wget",
                     "args": [
                         "-O",
-                        "full.jpg",
+                        "test_full.jpg",
                         "%{serverpath}:%{serverport}/image/full/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
                     ]
                 }
@@ -81,20 +75,13 @@
         {
             "tab": "Test Server",
             "name": "Get Thunbnail Image",
-            "desc": "2007-05-27_Brixham/P1010379.JPG",
+            "desc": "20120721_191041.jpg",
             "list": [
-                {
-                    "cmd": "rm",
-                    "args": [
-                        "P1010379.JPG"
-                    ],
-                    "ignoreError": true
-                },
                 {
                     "cmd": "wget",
                     "args": [
                         "-O",
-                        "tn.jpg",
+                        "test_tn.jpg",
                         "%{serverpath}:%{serverport}/image/200/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
                     ]
                 }
@@ -110,24 +97,11 @@
                     "args": []
                 },
                 {
-                    "cmd": "rm",
-                    "args": [
-                        "dirs.data"
-                    ],
-                    "ignoreError": true
-                },
-                {
                     "cmd": "wget",
                     "args": [
                         "-O",
-                        "dirs.data",
+                        "test_dirs.data",
                         "%{serverpath}:%{serverport}/files/tree"
-                    ]
-                },
-                {
-                    "cmd": "cat",
-                    "args": [
-                        "dirs.data"
                     ]
                 }
             ]
@@ -142,24 +116,11 @@
                     "args": []
                 },
                 {
-                    "cmd": "rm",
-                    "args": [
-                        "files.data"
-                    ],
-                    "ignoreError": true
-                },
-                {
                     "cmd": "wget",
                     "args": [
                         "-O",
-                        "files.data",
+                        "test_files.data",
                         "%{serverpath}:%{serverport}/files/list/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden"
-                    ]
-                },
-                {
-                    "cmd": "cat",
-                    "args": [
-                        "files.data"
                     ]
                 }
             ]
