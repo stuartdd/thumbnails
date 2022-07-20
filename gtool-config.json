@@ -37,7 +37,13 @@
                 {
                     "cmd": "rm",
                     "args": [
-                        "test_*"
+                        "-f", "test_191041.full.jpg"
+                    ]
+                },
+                {
+                    "cmd": "rm",
+                    "args": [
+                        "-f", "test_191041.200.jpg"
                     ]
                 }
             ]
@@ -48,12 +54,8 @@
             "desc": "Close the Server --> %{serverpath}:%{serverport}",
             "list": [
                 {
-                    "cmd": "wget",
-                    "args": [
-                        "-O",
-                        "test_close.data",
-                        "%{serverpath}:%{serverport}/control/close"
-                    ]
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/control/close"
                 }
             ]
         },
@@ -63,12 +65,9 @@
             "desc": "20120721_191041.jpg",
             "list": [
                 {
-                    "cmd": "wget",
-                    "args": [
-                        "-O",
-                        "test_full.jpg",
-                        "%{serverpath}:%{serverport}/image/full/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
-                    ]
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/image/full/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg",
+                    "stdout": "test_191041.full.jpg"
                 }
             ]
         },
@@ -78,12 +77,24 @@
             "desc": "20120721_191041.jpg",
             "list": [
                 {
-                    "cmd": "wget",
-                    "args": [
-                        "-O",
-                        "test_tn.jpg",
-                        "%{serverpath}:%{serverport}/image/200/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg"
-                    ]
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/image/200/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg",
+                    "stdout": "test_191041.200.jpg"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get Time UP",
+            "desc": "List directories",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/control/time"
                 }
             ]
         },
@@ -97,12 +108,8 @@
                     "args": []
                 },
                 {
-                    "cmd": "wget",
-                    "args": [
-                        "-O",
-                        "test_dirs.data",
-                        "%{serverpath}:%{serverport}/files/tree"
-                    ]
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/tree"
                 }
             ]
         },
@@ -116,12 +123,8 @@
                     "args": []
                 },
                 {
-                    "cmd": "wget",
-                    "args": [
-                        "-O",
-                        "test_files.data",
-                        "%{serverpath}:%{serverport}/files/list/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden"
-                    ]
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/list/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden"
                 }
             ]
         }

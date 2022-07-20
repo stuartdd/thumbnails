@@ -66,7 +66,7 @@ type TNServer struct {
 	getRoutes map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp
 	srcPath   string
 	verbose   bool
-	startTime time.Time
+	startTime int64
 }
 
 func fileSystemHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Request) *TNResp {
@@ -185,14 +185,14 @@ func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.
 		return CLOSED
 	}
 	if uri[0] == "time" {
-		return &TNResp{returnCode: http.StatusOK, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"up\": \"%s\"}", tns.startTime))}
+		return &TNResp{returnCode: http.StatusOK, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"upSeconds\": \"%d\"}", time.Now().Unix()-tns.startTime))}
 	}
 	return NF("CNTL", uri, nil)
 }
 
 func NewTnServer(port int, srcPath string, verbose bool) *TNServer {
 	routes := make(map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp)
-	tns := &TNServer{port: port, srcPath: srcPath, getRoutes: routes, verbose: verbose, startTime: time.Now()}
+	tns := &TNServer{port: port, srcPath: srcPath, getRoutes: routes, verbose: verbose, startTime: time.Now().Unix()}
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
