@@ -34,17 +34,18 @@ const (
 	TIME_FORMAT_3 = "20060102_150405"
 	NAME_MASK     = "%YYYY_%MM_%DD_%h_%m_%s_%n.%x"
 
-	NC_ARG          = "noclobber"
-	VB_ARG          = "verbose"
-	HELP_ARG        = "help"
-	MASK_ARG        = "mask="
-	SIZE_ARG        = "size="
-	SERVER_PORT_ARG = "serverport="
+	NC_ARG            = "noclobber"
+	VB_ARG            = "verbose"
+	HELP_ARG          = "help"
+	MASK_ARG          = "mask="
+	SIZE_ARG          = "size="
+	SERVER_PORT_ARG   = "serverport="
+	SERVER_CONFIG_ARG = "serverconfig="
 
 	HELP_HINT = ". Use 'help' option to view usage"
 )
 
-func NewPicture(source string, loadExif bool) *Picture {
+func NewPicture(source string, thumbnail bool) *Picture {
 	_, fName := filepath.Split(source)
 	ext := filepath.Ext(strings.ToLower(fName))
 	name := fName[0 : len(fName)-len(ext)]
@@ -64,7 +65,7 @@ func NewPicture(source string, loadExif bool) *Picture {
 		return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
 	}
 	defer f.Close()
-	if loadExif {
+	if thumbnail {
 		x, err := exif.Decode(f)
 		if err != nil {
 			return &Picture{source: source, name: name, ext: ext, orientation: 1, modTime: modTime, time: picTime, err: err}
@@ -141,17 +142,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("Source path '%s' is invalid %s%s", os.Args[1], err.Error(), HELP_HINT)
 	}
-	srcInfo, err := os.Stat(srcPath)
+	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
 	if err != nil {
-		log.Fatalf("Source path:%s%s", err.Error()[5:], HELP_HINT)
-	}
-	if !srcInfo.IsDir() {
-		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
+		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
 	}
 	verbose := findBoolArg(VB_ARG, true)
 	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
 	if serverPort > -1 {
-		tns := NewTnServer(serverPort, srcPath, verbose)
+		configDataFile := findStringArg(SERVER_CONFIG_ARG, "")
+		if configDataFile == "" {
+			log.Fatalf("Config data arg [%s] is not defined.", SERVER_CONFIG_ARG)
+		}
+		tns, configErr := NewTnServer(serverPort, srcPath, configDataFile, sizeInt, verbose)
+		if configErr != nil {
+			log.Fatalf("Config data [%s] error '%s'.", configDataFile, configErr.Error())
+		}
 		err := tns.Run()
 		if err != nil {
 			if err != http.ErrServerClosed {
@@ -164,10 +169,12 @@ func main() {
 		}
 		os.Exit(0)
 	}
-
-	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
+	srcInfo, err := os.Stat(srcPath)
 	if err != nil {
-		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
+		log.Fatalf("Source path:%s%s", err.Error()[5:], HELP_HINT)
+	}
+	if !srcInfo.IsDir() {
+		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
 	}
 	dstPath, err := filepath.Abs(os.Args[2])
 	if err != nil {
@@ -223,7 +230,11 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool) (*
 	}
 
 	if verbose {
-		logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
+		if thumbName == "" {
+			logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s", sw, sh, pic.orientation, pic.source), nil)
+		} else {
+			logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
+		}
 	}
 
 	dstImage := image.NewRGBA(image.Rect(0, 0, sw, sh))

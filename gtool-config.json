@@ -37,13 +37,15 @@
                 {
                     "cmd": "rm",
                     "args": [
-                        "-f", "test_191041.full.jpg"
+                        "-f",
+                        "test_191041.full.jpg"
                     ]
                 },
                 {
                     "cmd": "rm",
                     "args": [
-                        "-f", "test_191041.200.jpg"
+                        "-f",
+                        "test_191041.200.jpg"
                     ]
                 }
             ]
@@ -66,7 +68,7 @@
             "list": [
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/image/full/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg",
                     "stdout": "test_191041.full.jpg"
                 }
             ]
@@ -78,15 +80,30 @@
             "list": [
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/image/200/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F20120721_191041.jpg",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg?thumbnail=200",
                     "stdout": "test_191041.200.jpg"
                 }
             ]
         },
         {
             "tab": "Test Server",
+            "name": "GetText File",
+            "desc": "textDoc.txt",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/./name/textDoc.txt"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
             "name": "Get Time UP",
-            "desc": "List directories",
+            "desc": "Seconds server up",
             "list": [
                 {
                     "cmd": "clear",
@@ -101,7 +118,7 @@
         {
             "tab": "Test Server",
             "name": "Get Dir",
-            "desc": "List directories",
+            "desc": "List directories for stuart",
             "list": [
                 {
                     "cmd": "clear",
@@ -109,7 +126,22 @@
                 },
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/files/tree"
+                    "stdin": "http:%{serverpath}:%{serverport}/paths/user/stuart/loc/thumbs"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get ALL files Dir",
+            "desc": "List directories for stuart",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/paths/user/stuart/loc/thumbs?allfiles=true"
                 }
             ]
         },
@@ -124,7 +156,22 @@
                 },
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/files/list/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden"
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get ALL Files",
+            "desc": "List files except . files",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F?allfiles=true"
                 }
             ]
         }

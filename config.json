@@ -1,0 +1,16 @@
+{
+    "resources": {
+        "users": {
+            "stuart": {
+                "name": "Stuart",
+                "thumbs": "",
+                "original": ""
+            },
+            "shared": {
+                "name": "Something for everyone",
+                "thumbs": "",
+                "original": ""
+            }
+        }
+    }
+}

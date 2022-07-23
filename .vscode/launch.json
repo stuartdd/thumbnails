@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": ".",
-            "args": ["srcPics", "serverport=8090", "size=200", "verbose"]
+            "args": ["srcPics", "serverport=8090", "serverconfig=config.json", "size=50", "verbose"]
         }
     ]
 }
