@@ -64,7 +64,7 @@
         {
             "tab": "Test Server",
             "name": "Test .. redirection",
-            "desc": "should fail",
+            "desc": "should fail with Bad-Request + invalid-path",
             "list": [
                 {
                     "cmd": "clear",
@@ -72,7 +72,7 @@
                 },
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F?allfiles=true"
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/%2E%2E%2F%2Egit%2F?allfiles=true"
                 }
             ]
         },
@@ -177,7 +177,7 @@
         },
         {
             "tab": "Test Server",
-            "name": "Get ALL Files",
+            "name": "Get ALL Files  (InTheGarden)",
             "desc": "List files except . files",
             "list": [
                 {
@@ -187,6 +187,51 @@
                 {
                     "cmd": "cat",
                     "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F?allfiles=true"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get ALL Files (Brixham)",
+            "desc": "List files except . files in dir with a dir",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-05-27_Brixham?allfiles=true"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get ALL Files (root)",
+            "desc": "List files except . files in dir with a dir",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/%2E?allfiles=true"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
+            "name": "Get NO Files (root)",
+            "desc": "List with no files returned",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/%2E"
                 }
             ]
         }

@@ -45,13 +45,13 @@ var (
 )
 
 func UMT(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("UnsupportedMediaType:%s:", tag), strings.Join(uri, URL_SEP), err)
-	return &TNResp{returnCode: http.StatusUnsupportedMediaType, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Unsupported Media Type\", \"Entity\": \"%s\"\"}", ent))}
+	logError(fmt.Sprintf("UnsupportedMediaType:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
+	return &TNResp{returnCode: http.StatusUnsupportedMediaType, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Unsupported Media Type\", \"Item\": \"%s\"\"}", ent))}
 }
 
 func ISE(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("InternalServerError:%s:", tag), strings.Join(uri, URL_SEP), err)
-	return &TNResp{returnCode: http.StatusInternalServerError, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Internal Server Error\", \"Entity\": \"%s\"\"}", ent))}
+	logError(fmt.Sprintf("InternalServerError:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
+	return &TNResp{returnCode: http.StatusInternalServerError, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Internal Server Error\", \"Item\": \"%s\"\"}", ent))}
 }
 
 func NF(tag string, uri []string, err error) *TNResp {
@@ -60,7 +60,7 @@ func NF(tag string, uri []string, err error) *TNResp {
 }
 
 func BR(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("BadRequest:%s:", tag), strings.Join(uri, URL_SEP), err)
+	logError(fmt.Sprintf("BadRequest:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
 	return &TNResp{returnCode: http.StatusBadRequest, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Bad Request\", \"Value\": \"%s\"\"}", ent))}
 }
 
@@ -179,18 +179,22 @@ func locationFromPath(uri []string, tns *TNServer) (string, *TNResp) {
 	return location, nil
 }
 
-func filePathFromPath(uri []string, location string, tns *TNServer) (string, bool, *TNResp) {
+func filePathFromPath(uri []string, location string, tns *TNServer, pathRequired bool) (string, bool, *TNResp) {
 	path := dataFromPathElement(uri, "path")
 	if path == "" {
-		return "", false, NF("PATH", uri, nil)
+		if pathRequired {
+			return "", false, NF("PATH", uri, nil)
+		}
 	}
 	unEscapedPath, err := url.PathUnescape(path)
 	if err != nil {
 		return "", false, BR("PATH", path, uri, err)
 	}
+
 	if unEscapedPath == "." {
 		unEscapedPath = ""
 	}
+
 	fullPath := ""
 	name := dataFromPathElement(uri, "name")
 	if name == "" {
@@ -202,7 +206,9 @@ func filePathFromPath(uri []string, location string, tns *TNServer) (string, boo
 		}
 		fullPath = filepath.Join(location, unEscapedPath, unEscapedName)
 	}
-
+	if !strings.HasPrefix(fullPath, location) {
+		return "", false, BR("PATH", "invalid-path", uri, nil)
+	}
 	fil, err := os.Stat(fullPath)
 	if err != nil {
 		return "", false, NF("PATH", uri, nil)
@@ -219,14 +225,23 @@ func pathHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Req
 		return resp
 	}
 
+	path, isDir, resp := filePathFromPath(uri, location, tns, false)
+	if resp != nil {
+		return resp
+	}
+
+	if !isDir {
+		return BR("PATH", "not-dir", uri, nil)
+	}
+
 	var sb strings.Builder
 	count := 0
 	sb.WriteString("[")
-	fsys := os.DirFS(location)
+	fsys := os.DirFS(path)
 	fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if d != nil {
 			if d.IsDir() && p != "." {
-				fp := filepath.Join(location, p)
+				fp := filepath.Join(path, p)
 				if len(filesOfInterest(fp, queryAllFile(r))) > 0 {
 					sb.WriteString(fmt.Sprintf("\n  \"%s\",", url.PathEscape(p+PATH_SEP)))
 					count++
@@ -255,7 +270,7 @@ func fileHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Req
 		return NF("FILE", uri, nil)
 	}
 
-	path, isDir, resp := filePathFromPath(uri, location, tns)
+	path, isDir, resp := filePathFromPath(uri, location, tns, true)
 	if resp != nil {
 		return resp
 	}
@@ -396,9 +411,11 @@ func filesOfInterest(path string, all bool) []string {
 	}
 	for _, f := range files {
 		if !strings.HasPrefix(f.Name(), ".") {
-			mt := mime.TypeByExtension(strings.ToLower(filepath.Ext(f.Name())))
-			if all || strings.HasPrefix(mt, "image/") {
-				list = append(list, f.Name())
+			if !f.IsDir() {
+				mt := mime.TypeByExtension(strings.ToLower(filepath.Ext(f.Name())))
+				if all || strings.HasPrefix(mt, "image/") {
+					list = append(list, f.Name())
+				}
 			}
 		}
 	}

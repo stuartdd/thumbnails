@@ -80,15 +80,15 @@ The idea of a user and a users locations is embedded in the config file. This in
 
 for example to access any file via the server the following http request is required:
 
-``` 
+``` http
 http://{serverpath}:{serverport}/files/user/{user}/loc/{loc}/path/{path}/name/{name}
 ```
 
-Where 
+Where:
 
 | Item | description | example for 'user1' above |
 | ----------- | ----------- | ----------- |
-| {serverpath} | The server host address | http://192.168.0.5 |
+| {serverpath} | The server host address | ``` http://192.168.0.5 ``` |
 | {serverport} | The server host port as defined with the serverport= server parameter | 8090 |
 | {user} | The user name from the config file | 'user1' from above config data |
 | {log} | The user location from the config file | 'dir1' or 'dir2' from above config data |
@@ -101,9 +101,9 @@ If the server is started as follows and starts on ip address and port '192.168.1
 thumbnails /home/user/data serverport=8090 serverconfig=config.json size=200 verbose
 ```
 
-The follwoing request would download the full image1.jpg from '/home/user/data/files1/images/set1'
+The follwoing request would download the full 'image1.jpg' from '/home/user/data/files1/images/set1'
 
-```
+``` link
 http://192.168.1.1:8090/files/user/user1/loc/dir1/path/images%2Fset1/name/image1.jpg
 ```
 
@@ -115,21 +115,21 @@ This applies to both {path} and {name} parameters.
 
 The following request would download the full image1.jpg from '/home/user/data/files2/docs'
 
-```
+``` link
 http://192.168.1.1:8090/files/user/user1/loc/dir2/path/./name/image1.jpg
 ```
 
 To download a thumbnail add the thumbnail query parameter to the request:
 
-The follwoing request would download the thumbnail image1.jpg from '/home/user/data/files2/docs'. The size would be 200 as defined by the 'size=n' server parameter. 
+The follwoing request would download the thumbnail image1.jpg from '/home/user/data/files2/docs'. The size would be 200 as defined by the 'size=n' server parameter.
 
-```
+``` link
 http://192.168.1.1:8090/files/user/user1/loc/dir2/path/./name/image1.jpg?thumbnail=true
 ```
 
-The follwoing request would download the thumbnail image1.jpg from '/home/user/data/files2/docs'. The size would be 100 ignoring the 'size=n' server parameter. 
+The follwoing request would download the thumbnail image1.jpg from '/home/user/data/files2/docs'. The size would be 100 ignoring the 'size=n' server parameter.
 
-```
+``` link
 http://192.168.1.1:8090/files/user/user1/loc/dir2/path/./name/image1.jpg?thumbnail=100
 ```
 
