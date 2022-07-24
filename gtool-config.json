@@ -63,12 +63,27 @@
         },
         {
             "tab": "Test Server",
+            "name": "Test .. redirection",
+            "desc": "should fail",
+            "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
+                {
+                    "cmd": "cat",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F?allfiles=true"
+                }
+            ]
+        },
+        {
+            "tab": "Test Server",
             "name": "Get Full Image",
             "desc": "20120721_191041.jpg",
             "list": [
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg",
                     "stdout": "test_191041.full.jpg"
                 }
             ]
@@ -80,7 +95,7 @@
             "list": [
                 {
                     "cmd": "cat",
-                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg?thumbnail=200",
+                    "stdin": "http:%{serverpath}:%{serverport}/files/user/stuart/loc/thumbs/path/2007-08-25_London%2F2007-04-14_Owains_Birthday%2F2012-07-21_InTheGarden%2F/name/20120721_191041.jpg?thumbnail=200",
                     "stdout": "test_191041.200.jpg"
                 }
             ]
