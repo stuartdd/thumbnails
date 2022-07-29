@@ -2,5 +2,5 @@ github.com/liujiawm/graphics-go v0.0.0-20200331105750-879216a3393f h1:lJQL5KVEmH
 github.com/liujiawm/graphics-go v0.0.0-20200331105750-879216a3393f/go.mod h1:E0n/KirZ2EH6BhBRp+oN6TPeiFmgOMyP6lbM9mHAJjU=
 github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd h1:CmH9+J6ZSsIjUK3dcGsnCnO41eRBOnY12zwkn5qVwgc=
 github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd/go.mod h1:hPqNNc0+uJM6H+SuU8sEs5K5IQeKccPqeSjfgcKGgPk=
-github.com/stuartdd2/JsonParser4go/parser v0.0.0-20220502134404-5ff371a3430e h1:UMjpJN0grdvkUr4b50rI6rGGtT/SUhs2daMU9ZOSkTU=
-github.com/stuartdd2/JsonParser4go/parser v0.0.0-20220502134404-5ff371a3430e/go.mod h1:7VThxTiwmsx+T75uQc7HbShiZibkIQjEMKNuNdoZxHw=
+github.com/stuartdd2/JsonParser4go/parser v0.0.0-20220729214751-7eddfb61aeda h1:UtnzfWPFqMTgsZ8OWluuzL1WmwGnw7uQLl/HCnWA3CM=
+github.com/stuartdd2/JsonParser4go/parser v0.0.0-20220729214751-7eddfb61aeda/go.mod h1:7VThxTiwmsx+T75uQc7HbShiZibkIQjEMKNuNdoZxHw=

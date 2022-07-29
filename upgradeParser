@@ -1,0 +1,6 @@
+#!/bin/bash
+
+go get github.com/stuartdd2/JsonParser4go/parser@$1
+go mod tidy
+echo DONE
+pwd
