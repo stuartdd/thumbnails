@@ -9,22 +9,25 @@
                 "desc": "Server URL",
                 "value": "http://localhost"
             }
-        }
+        },
+        "runAtStart": "Set GIT stuartdd",
+        "runAtStartDelay": 100
     },
     "actions": [
         {
-            "tab": "Test Server",
-            "name": "Start X",
-            "desc": "Build and Start Server --> %{serverpath}:%{serverport}",
+            "tab": "DEV",
+            "name": "TEST",
+            "desc": "Run GO test",
             "list": [
+                {
+                    "cmd": "clear",
+                    "args": []
+                },
                 {
                     "cmd": "go",
                     "args": [
-                        "run",
-                        ".",
-                        "srcPics",
-                        "serverport=%{serverport}",
-                        "verbose"
+                        "test",
+                        "-v"
                     ]
                 }
             ]
@@ -38,13 +41,9 @@
                     "cmd": "rm",
                     "args": [
                         "-f",
-                        "test_191041.full.jpg"
-                    ]
-                },
-                {
-                    "cmd": "rm",
-                    "args": [
-                        "-f",
+                        "__debug_bin",
+                        "thumbnails",
+                        "test_191041.full.jpg",
                         "test_191041.200.jpg"
                     ]
                 }
