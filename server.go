@@ -18,6 +18,22 @@ import (
 	"github.com/stuartdd2/JsonParser4go/parser"
 )
 
+type UserData struct {
+	userName  string
+	locations map[string]string
+}
+
+type TNServer struct {
+	port          int
+	server        *http.Server
+	thumbNailSize int
+	getRoutes     map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp
+	srcPath       string
+	verbose       bool
+	startTime     int64
+	users         map[string]*UserData
+}
+
 type TNResp struct {
 	returnCode int
 	mimeType   string
@@ -64,20 +80,68 @@ func BR(tag, ent string, uri []string, err error) *TNResp {
 	return &TNResp{returnCode: http.StatusBadRequest, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Bad Request\", \"Value\": \"%s\"\"}", ent))}
 }
 
-type UserData struct {
-	userName  string
-	locations map[string]string
+func (s *TNResp) String() string {
+	return fmt.Sprintf("{\"RESPONSE\":{\"rc\":\"%d\",\"mime\":\"%s\",\"len\":\"%d\",\"resp\":\"%s\" }}", s.returnCode, s.mimeType, len(s.resp), encodeString(s.resp, 50, s.mimeType))
 }
 
-type TNServer struct {
-	port          int
-	server        *http.Server
-	thumbNailSize int
-	getRoutes     map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp
-	srcPath       string
-	verbose       bool
-	startTime     int64
-	users         map[string]*UserData
+/*
+   Backspace is replaced with \b.
+   Form feed is replaced with \f.
+   Newline is replaced with \n.
+   Carriage return is replaced with \r.
+   Tab is replaced with \t.
+   Double quote is replaced with \"
+   Backslash is replaced with \\
+*/
+func encodeString(b []byte, max int, mt string) string {
+	image := strings.Contains(mt, "image")
+	var sb strings.Builder
+	for i, c := range b {
+		if image {
+			sb.WriteRune('[')
+			if c < 16 {
+				sb.WriteRune('0')
+			}
+			sb.WriteString(strconv.FormatInt(int64(c), 16))
+			sb.WriteRune(']')
+		} else {
+			switch c {
+			case 8:
+				sb.WriteRune('\\')
+				sb.WriteRune('b')
+			case 12:
+				sb.WriteRune('\\')
+				sb.WriteRune('f')
+			case 10:
+				sb.WriteRune('\\')
+				sb.WriteRune('n')
+			case 13:
+				sb.WriteRune('\\')
+				sb.WriteRune('r')
+			case 11:
+				sb.WriteRune('\\')
+				sb.WriteRune('t')
+			case 34:
+				sb.WriteRune('\\')
+				sb.WriteRune('"')
+			case 92:
+				sb.WriteRune('\\')
+				sb.WriteRune('\\')
+			default:
+				if c >= 32 && c <= 127 {
+					sb.WriteByte(c)
+				}
+			}
+		}
+		if i > 25 && image {
+			break
+		} else {
+			if i > max {
+				break
+			}
+		}
+	}
+	return sb.String()
 }
 
 func NewTnServer(port int, srcPath, configPath string, sizeInt int, verbose bool) (*TNServer, error) {
@@ -95,6 +159,9 @@ func NewTnServer(port int, srcPath, configPath string, sizeInt int, verbose bool
 	configData, err := parser.Parse(j)
 	if err != nil {
 		return nil, err
+	}
+	if verbose {
+		log.Printf("{\"CONFIG\":{\"file\":\"%s\",\"info\":\"Parsed config ok\"}}", absFileName)
 	}
 	userDataNode, err := parser.Find(configData, USER_PATH)
 	if err != nil {
@@ -119,6 +186,14 @@ func NewTnServer(port int, srcPath, configPath string, sizeInt int, verbose bool
 			}
 		}
 		userMap[ud.GetName()] = &UserData{userName: name, locations: locations}
+		if verbose {
+			n := ud.(parser.NodeC).GetNodeWithName("name")
+			if n != nil {
+				log.Printf("{\"CONFIG\":{\"user\":\"%s\",\"info\":\"%s\"}}", ud.GetName(), n)
+			} else {
+				log.Printf("{\"CONFIG\":{\"user\":\"%s\",\"info\":\"undefined\"}}", ud.GetName())
+			}
+		}
 	}
 
 	routes := make(map[string]func([]string, *TNServer, http.ResponseWriter, *http.Request) *TNResp)
@@ -135,6 +210,9 @@ func NewTnServer(port int, srcPath, configPath string, sizeInt int, verbose bool
 				rq = rq[1:]
 			}
 			if r.Method == http.MethodGet {
+				if verbose {
+					log.Printf("{\"REQUEST\":{\"path\":\"%s\", \"query\":\"%s\"}}", p, r.URL.RawQuery)
+				}
 				fn, found := tns.getRoutes[rq[0]]
 				var resp *TNResp
 				if found && len(rq) > 1 {
@@ -154,7 +232,7 @@ func NewTnServer(port int, srcPath, configPath string, sizeInt int, verbose bool
 	tns.AddGetHandler("paths", pathHandler)
 	tns.server = srv
 	if verbose {
-		log.Printf("Created server: port:%d, src:%s", port, configPath)
+		log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"Configured\"}}", port)
 	}
 	return tns, nil
 }
@@ -280,7 +358,7 @@ func fileHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.Req
 	}
 
 	thumbnail, thumbNailSize := queryThumbnail(r, tns.thumbNailSize)
-	return returnFileContent(path, uri, thumbnail, tns.verbose, thumbNailSize)
+	return returnFileContent(path, uri, thumbnail, thumbNailSize, tns)
 }
 
 func returnFileList(path string, all bool) *TNResp {
@@ -300,7 +378,7 @@ func returnFileList(path string, all bool) *TNResp {
 	return &TNResp{returnCode: http.StatusOK, mimeType: MEDIA_JSON, resp: []byte(s + "\n]")}
 }
 
-func returnFileContent(srcFile string, uri []string, thumbnail, verbose bool, thumbNailSize int) *TNResp {
+func returnFileContent(srcFile string, uri []string, thumbnail bool, thumbNailSize int, tns *TNServer) *TNResp {
 	ext := filepath.Ext(srcFile)
 	_, fName := filepath.Split(srcFile)
 
@@ -313,7 +391,7 @@ func returnFileContent(srcFile string, uri []string, thumbnail, verbose bool, th
 		if pic.err != nil {
 			return NF("IMAGE", uri, pic.err)
 		}
-		dstImage, err := createThumbImage(pic, "", thumbNailSize, verbose)
+		dstImage, err := createThumbImage(pic, "", thumbNailSize, tns.verbose, true, len(tns.srcPath))
 		if err != nil {
 			return ISE("THUMB", pic.GetFileName(), uri, err)
 		}
@@ -340,7 +418,7 @@ func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.
 			tns.Close()
 		}()
 		if tns.verbose {
-			log.Printf("Stop server requested: port:%d", tns.port)
+			log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"Stopping\"}}", tns.port)
 		}
 		return CLOSED
 	}
@@ -351,6 +429,9 @@ func controlHandler(uri []string, tns *TNServer, w http.ResponseWriter, r *http.
 }
 
 func writeResp(tns *TNServer, w http.ResponseWriter, resp *TNResp) {
+	if tns.verbose {
+		log.Print(resp)
+	}
 	w.WriteHeader(resp.returnCode)
 	w.Header().Set("Content-Type", resp.mimeType)
 	w.Header().Add("Content-Length", fmt.Sprintf("%d", len(resp.resp)))
@@ -363,14 +444,14 @@ func (s *TNServer) AddGetHandler(uri string, handle func([]string, *TNServer, ht
 
 func (s *TNServer) Close() {
 	if s.verbose {
-		log.Printf("Stopping server: port:%d", s.port)
+		log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"Stopped\"}}", s.port)
 	}
 	s.server.Close()
 }
 
 func (s *TNServer) Run() error {
 	if s.verbose {
-		log.Printf("Starting server: port:%d", s.port)
+		log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"Started\"}}", s.port)
 	}
 	return s.server.ListenAndServe()
 }

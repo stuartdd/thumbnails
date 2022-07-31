@@ -9,9 +9,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/liujiawm/graphics-go/graphics"
@@ -39,11 +41,202 @@ const (
 	HELP_ARG          = "help"
 	MASK_ARG          = "mask="
 	SIZE_ARG          = "size="
+	LOG_FILE_ARG      = "logfile="
 	SERVER_PORT_ARG   = "serverport="
 	SERVER_CONFIG_ARG = "serverconfig="
 
 	HELP_HINT = ". Use 'help' option to view usage"
 )
+
+type LFWriter struct {
+	file        *os.File
+	currentName string
+	fileMask    string
+	lock        sync.Mutex
+	running     bool
+	delay       time.Duration
+}
+
+func NewLFWriter(fileMask string, delaySec uint) (*LFWriter, error) {
+	if delaySec < 5 {
+		return nil, fmt.Errorf("log rotation check must be above 5 seconds")
+	}
+	lfw := &LFWriter{fileMask: fileMask, currentName: "", file: nil, delay: time.Duration(delaySec * uint(time.Second)), running: false}
+	err := lfw.initWriter()
+	if err != nil {
+		return nil, err
+	}
+	go lfw.startTimeCheck()
+	return lfw, nil
+}
+
+func (lfw *LFWriter) Write(b []byte) (n int, err error) {
+	lfw.lock.Lock()
+	defer lfw.lock.Unlock()
+	return lfw.file.Write(b)
+}
+
+func (lfw *LFWriter) CloseLogWriter() {
+	lfw.running = false
+	lfw.file.Close()
+	lfw.file = nil
+}
+
+func (lfw *LFWriter) startTimeCheck() {
+	lfw.running = true
+	go func() {
+		for lfw.running {
+			time.Sleep(lfw.delay)
+			newName := lfw.deriveName()
+			if newName != lfw.currentName {
+				lfw.initWriter()
+			}
+		}
+	}()
+}
+
+func (lfw *LFWriter) initWriter() error {
+	lfw.lock.Lock()
+	defer lfw.lock.Unlock()
+
+	newName := lfw.deriveName()
+	if lfw.file != nil {
+		if newName == lfw.currentName {
+			return nil
+		}
+	}
+
+	if lfw.file != nil {
+		err := lfw.file.Close()
+		lfw.file = nil
+		if err != nil {
+			return err
+		}
+	}
+
+	logFile, err := os.OpenFile(newName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	lfw.currentName = newName
+	lfw.file = logFile
+	return nil
+}
+
+func (lfw *LFWriter) deriveName() string {
+	t := time.Now()
+	lfn := strings.ReplaceAll(lfw.fileMask, "%y", fmt.Sprintf("%d", t.Year()))
+	lfn = strings.ReplaceAll(lfn, "%d", fmt.Sprintf("%d", t.YearDay()))
+	lfn = strings.ReplaceAll(lfn, "%h", fmt.Sprintf("%d", t.Hour()))
+	lfn = strings.ReplaceAll(lfn, "%m", fmt.Sprintf("%d", t.Minute()))
+	return lfn
+}
+
+func main() {
+
+	if findBoolArg(HELP_ARG, true) {
+		exitWithHelp("", 0)
+	}
+	if len(os.Args) < 3 {
+		log.Fatalf("Not enough args [%d]%s", len(os.Args)-1, HELP_HINT)
+	}
+	srcPath, err := filepath.Abs(os.Args[1])
+	if err != nil {
+		log.Fatalf("Source path '%s' is invalid %s%s", os.Args[1], err.Error(), HELP_HINT)
+	}
+	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
+	if err != nil {
+		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
+	}
+	var logFileWriter *LFWriter
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			log.Printf("captured %v, stopping server and exiting rc=1..\n", sig)
+			if logFileWriter != nil {
+				logFileWriter.CloseLogWriter()
+			}
+			time.Sleep(time.Second)
+			os.Exit(1)
+		}
+	}()
+
+	logFile := findStringArg(LOG_FILE_ARG, "")
+	if logFile != "" {
+		logFileWriter, err = NewLFWriter(logFile, 60)
+		if err != nil {
+			log.Fatalf("Could not create timed log file. Name:%s Error:%e%s", logFile, err, HELP_HINT)
+		}
+		log.SetOutput(logFileWriter)
+		log.Printf("Log file created:")
+	}
+	defer func() {
+		if logFileWriter != nil {
+			logFileWriter.CloseLogWriter()
+		}
+	}()
+
+	verbose := findBoolArg(VB_ARG, true)
+	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
+	if serverPort > -1 {
+		configDataFile := findStringArg(SERVER_CONFIG_ARG, "")
+		if configDataFile == "" {
+			log.Fatalf("Config data arg [%s] is not defined.", SERVER_CONFIG_ARG)
+		}
+		tns, configErr := NewTnServer(serverPort, srcPath, configDataFile, sizeInt, verbose)
+		if configErr != nil {
+			log.Fatalf("Config data [%s] error '%s'.", configDataFile, configErr.Error())
+		}
+		err := tns.Run()
+		if err != nil {
+			if err != http.ErrServerClosed {
+				log.Fatal("Server Error: " + err.Error())
+			} else {
+				if verbose {
+					log.Println("Server Closed:")
+				}
+			}
+		}
+		return
+	}
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		log.Fatalf("Source path:%s%s", err.Error()[5:], HELP_HINT)
+	}
+	if !srcInfo.IsDir() {
+		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
+	}
+	dstPath, err := filepath.Abs(os.Args[2])
+	if err != nil {
+		log.Fatalf("Destination path '%s%s' is invalid %s", os.Args[2], err.Error(), HELP_HINT)
+	}
+	dstInfo, err := os.Stat(dstPath)
+	if err != nil {
+		log.Fatalf("Destination path:%s%s", err.Error()[5:], HELP_HINT)
+	}
+	if !dstInfo.IsDir() {
+		log.Fatalf("Destination path '%s%s' must be a directory.", srcPath, HELP_HINT)
+	}
+
+	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
+	noClobber := findBoolArg(NC_ARG, true)
+
+	filepath.Walk(srcPath, func(inPath string, info fs.FileInfo, errIn error) error {
+		if !info.IsDir() {
+			relPath, _ := filepath.Split(inPath[len(srcPath):])
+			relPath = filepath.Clean(relPath)
+			outPath := filepath.Clean(fmt.Sprintf("%s%s", dstPath, relPath))
+			_, err = os.Stat(outPath)
+			if err != nil {
+				os.MkdirAll(outPath, os.ModePerm)
+			}
+			thumb(inPath, outPath, fileNameMask, sizeInt, noClobber, verbose)
+		}
+		return nil
+	})
+}
 
 func NewPicture(source string, thumbnail bool) *Picture {
 	_, fName := filepath.Split(source)
@@ -131,82 +324,7 @@ func timeParseStr(strTime string) (time.Time, error) {
 	return t, nil
 }
 
-func main() {
-	if findBoolArg(HELP_ARG, true) {
-		exitWithHelp("", 0)
-	}
-	if len(os.Args) < 3 {
-		log.Fatalf("Not enough args [%d]%s", len(os.Args)-1, HELP_HINT)
-	}
-	srcPath, err := filepath.Abs(os.Args[1])
-	if err != nil {
-		log.Fatalf("Source path '%s' is invalid %s%s", os.Args[1], err.Error(), HELP_HINT)
-	}
-	sizeInt, err := findIntArg(SIZE_ARG, 10, 1000, 200)
-	if err != nil {
-		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
-	}
-	verbose := findBoolArg(VB_ARG, true)
-	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
-	if serverPort > -1 {
-		configDataFile := findStringArg(SERVER_CONFIG_ARG, "")
-		if configDataFile == "" {
-			log.Fatalf("Config data arg [%s] is not defined.", SERVER_CONFIG_ARG)
-		}
-		tns, configErr := NewTnServer(serverPort, srcPath, configDataFile, sizeInt, verbose)
-		if configErr != nil {
-			log.Fatalf("Config data [%s] error '%s'.", configDataFile, configErr.Error())
-		}
-		err := tns.Run()
-		if err != nil {
-			if err != http.ErrServerClosed {
-				log.Fatal("Server Error: " + err.Error())
-			} else {
-				if verbose {
-					log.Println("Server Closed:")
-				}
-			}
-		}
-		os.Exit(0)
-	}
-	srcInfo, err := os.Stat(srcPath)
-	if err != nil {
-		log.Fatalf("Source path:%s%s", err.Error()[5:], HELP_HINT)
-	}
-	if !srcInfo.IsDir() {
-		log.Fatalf("Source path '%s%s' must be a directory.", srcPath, HELP_HINT)
-	}
-	dstPath, err := filepath.Abs(os.Args[2])
-	if err != nil {
-		log.Fatalf("Destination path '%s%s' is invalid %s", os.Args[2], err.Error(), HELP_HINT)
-	}
-	dstInfo, err := os.Stat(dstPath)
-	if err != nil {
-		log.Fatalf("Destination path:%s%s", err.Error()[5:], HELP_HINT)
-	}
-	if !dstInfo.IsDir() {
-		log.Fatalf("Destination path '%s%s' must be a directory.", srcPath, HELP_HINT)
-	}
-
-	fileNameMask := findStringArg(MASK_ARG, NAME_MASK)
-	noClobber := findBoolArg(NC_ARG, true)
-
-	filepath.Walk(srcPath, func(inPath string, info fs.FileInfo, errIn error) error {
-		if !info.IsDir() {
-			relPath, _ := filepath.Split(inPath[len(srcPath):])
-			relPath = filepath.Clean(relPath)
-			outPath := filepath.Clean(fmt.Sprintf("%s%s", dstPath, relPath))
-			_, err = os.Stat(outPath)
-			if err != nil {
-				os.MkdirAll(outPath, os.ModePerm)
-			}
-			thumb(inPath, outPath, fileNameMask, sizeInt, noClobber, verbose)
-		}
-		return nil
-	})
-}
-
-func createThumbImage(pic *Picture, thumbName string, size int, verbose bool) (*image.RGBA, error) {
+func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, server bool, srcPrefix int) (*image.RGBA, error) {
 	imagePath, err := os.Open(pic.source)
 	if err != nil {
 		logError("OPEN:  ", pic.source, err)
@@ -230,10 +348,14 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool) (*
 	}
 
 	if verbose {
-		if thumbName == "" {
-			logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s", sw, sh, pic.orientation, pic.source), nil)
+		if server {
+			log.Printf("{\"THUMB\":{\"w\":\"%d\",\"h\":\"%d\",\"orientation\":\"%d\",\"source\":\"%s\"}}", sw, sh, pic.orientation, strings.ReplaceAll(pic.source[srcPrefix+1:], "\"", "\\\""))
 		} else {
-			logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
+			if thumbName == "" {
+				logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s", sw, sh, pic.orientation, pic.source), nil)
+			} else {
+				logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
+			}
 		}
 	}
 
@@ -292,7 +414,7 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 		}
 	}
 
-	dstImage, err := createThumbImage(pic, thumbFileName, size, verbose)
+	dstImage, err := createThumbImage(pic, thumbFileName, size, verbose, false, 0)
 	if err != nil {
 		return
 	}

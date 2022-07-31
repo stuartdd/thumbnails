@@ -57,6 +57,10 @@ As a last resort the current date time is used.
 
 The server has a json configuration file. Pass it's location in using 'serverconfig=' parameter.
 
+```bash
+thumbnails srcPics serverport=8090 serverconfig=config.json size=50 verbose logfile=serverlog_%y_%d_%h.log
+```
+
 ``` json
 {
     "resources": {
