@@ -63,13 +63,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid size option. Requires an int from 10..1000. %s%s", err.Error(), HELP_HINT)
 	}
+	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
+
 	var logFileWriter *LFWriter
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for sig := range c {
-			log.Printf("captured %v, stopping server and exiting rc=1..\n", sig)
+			log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"captured %v, stopping server and exiting rc=1..\"}}", serverPort, sig)
 			if logFileWriter != nil {
 				logFileWriter.CloseLogWriter()
 			}
@@ -80,12 +82,14 @@ func main() {
 
 	logFile := findStringArg(LOG_FILE_ARG, "")
 	if logFile != "" {
-		logFileWriter, err = NewLFWriter(logFile, 20)
+		logFileWriter, err = NewLFWriter(logFile, 60, func(s1, s2 string, err error) {
+			log.Printf("{\"LOGGER\":{\"type\":\"%s\",\"file\":\"%s\",\"error\":\"%s\"}}", s1, s2, EncodeString([]byte(err.Error()), 999, "json"))
+		})
 		if err != nil {
 			log.Fatalf("Could not create timed log file. Name:%s Error:%e%s", logFile, err, HELP_HINT)
 		}
 		log.SetOutput(logFileWriter)
-		log.Printf("Log file created:")
+		log.Printf("{\"LOGGER\":{\"type\":\"INFO\",\"text\":\"Created\"}}")
 	}
 	defer func() {
 		if logFileWriter != nil {
@@ -94,7 +98,6 @@ func main() {
 	}()
 
 	verbose := findBoolArg(VB_ARG, true)
-	serverPort, err := findIntArg(SERVER_PORT_ARG, -1, 9999999, -1)
 	if serverPort > -1 {
 		configDataFile := findStringArg(SERVER_CONFIG_ARG, "")
 		if configDataFile == "" {
@@ -110,7 +113,7 @@ func main() {
 				log.Fatal("Server Error: " + err.Error())
 			} else {
 				if verbose {
-					log.Println("Server Closed:")
+					log.Printf("{\"SERVER\":{\"port\":\"%d\",\"info\":\"Closed\"}}", serverPort)
 				}
 			}
 		}
@@ -242,13 +245,13 @@ func timeParseStr(strTime string) (time.Time, error) {
 func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, server bool, srcPrefix int) (*image.RGBA, error) {
 	imagePath, err := os.Open(pic.source)
 	if err != nil {
-		logError("OPEN:  ", pic.source, err)
+		logServer("OPEN", pic.source, err)
 		return nil, err
 	}
 	defer imagePath.Close()
 	srcImage, _, err := image.Decode(imagePath)
 	if err != nil {
-		logError("DECODE:", pic.source, err)
+		logServer("DECODE", pic.source, err)
 		return nil, err
 	}
 	b := srcImage.Bounds()
@@ -267,9 +270,9 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 			log.Printf("{\"THUMB\":{\"w\":\"%d\",\"h\":\"%d\",\"orientation\":\"%d\",\"source\":\"%s\"}}", sw, sh, pic.orientation, strings.ReplaceAll(pic.source[srcPrefix+1:], "\"", "\\\""))
 		} else {
 			if thumbName == "" {
-				logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s", sw, sh, pic.orientation, pic.source), nil)
+				logServer("INFO", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s", sw, sh, pic.orientation, pic.source), nil)
 			} else {
-				logError("INFO  :", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
+				logServer("INFO", fmt.Sprintf("W:%d H:%d Orientation:%d in:%s: out:%s", sw, sh, pic.orientation, pic.source, thumbName), nil)
 			}
 		}
 	}
@@ -277,7 +280,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 	dstImage := image.NewRGBA(image.Rect(0, 0, sw, sh))
 	err = graphics.Thumbnail(dstImage, srcImage)
 	if err != nil {
-		logError("THUMB :", pic.source, err)
+		logServer("THUMB", pic.source, err)
 		return nil, err
 	}
 
@@ -291,7 +294,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 			rotImage := image.NewRGBA(image.Rect(0, 0, sh, sw))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 1.5708}) // 90
 			if rotErr != nil {
-				logError("ROTATE:  90:", pic.source, rotErr)
+				logServer("ROTATE 90", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
@@ -299,7 +302,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 			rotImage := image.NewRGBA(image.Rect(0, 0, sw, sh))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 3.14159}) // 180
 			if rotErr != nil {
-				logError("ROTATE: 180:", pic.source, rotErr)
+				logServer("ROTATE 180", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
@@ -307,7 +310,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 			rotImage := image.NewRGBA(image.Rect(0, 0, sh, sw))
 			rotErr := graphics.Rotate(rotImage, dstImage, &graphics.RotateOptions{Angle: 4.71239}) // 270
 			if rotErr != nil {
-				logError("ROTATE: 270:", pic.source, rotErr)
+				logServer("ROTATE 270", pic.source, rotErr)
 			} else {
 				dstImage = rotImage
 			}
@@ -319,7 +322,7 @@ func createThumbImage(pic *Picture, thumbName string, size int, verbose bool, se
 func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbose bool) {
 	pic := NewPicture(srcFile, true)
 	if pic.err != nil {
-		logError("EXIF  :", srcFile, pic.err)
+		logServer("EXIF", srcFile, pic.err)
 	}
 	thumbFileName := fmt.Sprintf("%s%c%s", thumbPath, filepath.Separator, subFileName(pic.time, thumbNameMask, pic.name, "jpg"))
 	if noClobber {
@@ -336,14 +339,14 @@ func thumb(srcFile, thumbPath, thumbNameMask string, size int, noClobber, verbos
 
 	newImage, err := os.Create(thumbFileName)
 	if err != nil {
-		logError("CREATE:", thumbFileName, err)
+		logServer("CREATE", thumbFileName, err)
 		return
 	}
 	defer newImage.Close()
 
 	err = jpeg.Encode(newImage, dstImage, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	if err != nil {
-		logError("ENCODE:", thumbFileName, err)
+		logServer("ENCODE", thumbFileName, err)
 		return
 	}
 }
@@ -397,11 +400,11 @@ func strPad4(i int) string {
 	return "000" + strconv.Itoa(i)
 }
 
-func logError(tag, file string, err error) {
+func logServer(tag, info string, err error) {
 	if err == nil {
-		log.Printf("%s %s\n", tag, file)
+		log.Printf("{\"SERVER\":{\"type\":\"%s\",\"info\":\"%s\"}}", tag, info)
 	} else {
-		log.Printf("%s %s: %s\n", tag, file, err.Error())
+		log.Printf("{\"SERVER\":{\"type\":\"%s\",\"info\":\"%s\",\"error\":\"%s\"}}", tag, info, err.Error())
 	}
 }
 

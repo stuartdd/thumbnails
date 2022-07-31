@@ -61,27 +61,27 @@ var (
 )
 
 func UMT(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("UnsupportedMediaType:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
+	logServer(fmt.Sprintf("UnsupportedMediaType:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
 	return &TNResp{returnCode: http.StatusUnsupportedMediaType, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Unsupported Media Type\", \"Item\": \"%s\"\"}", ent))}
 }
 
 func ISE(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("InternalServerError:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
+	logServer(fmt.Sprintf("InternalServerError:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
 	return &TNResp{returnCode: http.StatusInternalServerError, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Internal Server Error\", \"Item\": \"%s\"\"}", ent))}
 }
 
 func NF(tag string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("NotFound:%s:", tag), strings.Join(uri, URL_SEP), err)
+	logServer(fmt.Sprintf("NotFound:%s:", tag), strings.Join(uri, URL_SEP), err)
 	return &TNResp{returnCode: http.StatusNotFound, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Not Found\", \"URI\": \"%s\"\"}", strings.Join(uri, URL_SEP)))}
 }
 
 func BR(tag, ent string, uri []string, err error) *TNResp {
-	logError(fmt.Sprintf("BadRequest:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
+	logServer(fmt.Sprintf("BadRequest:%s: ent:%s", tag, ent), strings.Join(uri, URL_SEP), err)
 	return &TNResp{returnCode: http.StatusBadRequest, mimeType: MEDIA_JSON, resp: []byte(fmt.Sprintf("{\"message\":\"Bad Request\", \"Value\": \"%s\"\"}", ent))}
 }
 
 func (s *TNResp) String() string {
-	return fmt.Sprintf("{\"RESPONSE\":{\"rc\":\"%d\",\"mime\":\"%s\",\"len\":\"%d\",\"resp\":\"%s\" }}", s.returnCode, s.mimeType, len(s.resp), encodeString(s.resp, 50, s.mimeType))
+	return fmt.Sprintf("{\"RESPONSE\":{\"rc\":\"%d\",\"mime\":\"%s\",\"len\":\"%d\",\"resp\":\"%s\" }}", s.returnCode, s.mimeType, len(s.resp), EncodeString(s.resp, 50, s.mimeType))
 }
 
 /*
@@ -93,7 +93,7 @@ func (s *TNResp) String() string {
    Double quote is replaced with \"
    Backslash is replaced with \\
 */
-func encodeString(b []byte, max int, mt string) string {
+func EncodeString(b []byte, max int, mt string) string {
 	image := strings.Contains(mt, "image")
 	var sb strings.Builder
 	for i, c := range b {

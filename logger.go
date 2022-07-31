@@ -3,32 +3,115 @@ package main
 import (
 	"fmt"
 	_ "image/png"
-	"io"
-	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
 
+type LFFlag int
+
+const (
+	USE_F1 LFFlag = iota
+	USE_F2
+	USE_NONE
+)
+
+type LFFileData struct {
+	file        *os.File
+	fileName    string
+	notifyError func(string, string, error)
+}
+
 type LFWriter struct {
-	file           *os.File
-	fallback       io.Writer
-	currentName    string
+	use            LFFlag
+	file1          *LFFileData
+	file2          *LFFileData
 	fileMask       string
 	lock           sync.Mutex
 	monitorRunning bool
-	delay          time.Duration
+	monitorDelay   time.Duration
+}
+
+func (fd *LFFileData) notify(id, file string, err error) error {
+	if fd.notifyError != nil {
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			fd.notifyError(id, file, err)
+		}()
+	}
+	return err
+}
+
+func (fd *LFFileData) requiresChange(newName string) bool {
+	if fd.fileName == "" {
+		return false
+	}
+	return newName != fd.fileName
+}
+
+func (fd *LFFileData) write(b []byte) (int, error) {
+	if fd.file != nil {
+		return fd.file.Write(b)
+	}
+	return os.Stderr.Write(b)
+}
+
+func (fd *LFFileData) open(name string) error {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return fd.notify("OPEN", name, err)
+	} else {
+		fd.file = f
+		fd.fileName = name
+	}
+	return nil
+}
+
+func (fd *LFFileData) close() {
+	if fd.file == nil {
+		fd.notify("CLOSE", fd.fileName, fmt.Errorf("file is nil"))
+		return
+	}
+	err := fd.file.Close()
+	if err != nil {
+		fd.notify("CLOSE", fd.fileName, err)
+	}
+	fd.file = nil
+	if fd.fileName == "" {
+		fd.notify("STAT", fd.fileName, fmt.Errorf("filename is \"\""))
+		return
+	}
+	s, err := os.Stat(fd.fileName)
+	if err != nil {
+		fd.notify("STAT", fd.fileName, err)
+	} else {
+		if s.Size() < 10 {
+			err := os.Remove(fd.fileName)
+			if err != nil {
+				fd.notify("REMOVE", fd.fileName, err)
+			}
+		}
+	}
 }
 
 //
 // Create the LogFile Writer.
 //
-func NewLFWriter(fileMask string, delaySec uint) (*LFWriter, error) {
+func NewLFWriter(fileMask string, delaySec uint, notifyError func(string, string, error)) (*LFWriter, error) {
 	if delaySec < 5 {
 		return nil, fmt.Errorf("log rotation check must be above 5 seconds")
 	}
-	return &LFWriter{fileMask: fileMask, currentName: _deriveNameForLogWriter(fileMask), file: nil, delay: time.Duration(delaySec * uint(time.Second)), monitorRunning: false, fallback: log.Writer()}, nil
+	f1 := &LFFileData{file: nil, fileName: "", notifyError: notifyError}
+	f2 := &LFFileData{file: nil, fileName: "", notifyError: notifyError}
+	lfw := &LFWriter{fileMask: fileMask, file1: f1, file2: f2, monitorDelay: time.Duration(delaySec * uint(time.Second)), monitorRunning: false}
+	err := lfw.file1.open(_deriveNameForLogWriter(lfw.fileMask))
+	if err != nil {
+		return nil, err
+	}
+	lfw.use = USE_F1
+	lfw.startMonitor()
+	return lfw, nil
 }
 
 //
@@ -40,18 +123,10 @@ func NewLFWriter(fileMask string, delaySec uint) (*LFWriter, error) {
 func (lfw *LFWriter) CloseLogWriter() {
 	lfw.lock.Lock()
 	defer lfw.lock.Unlock()
-	lfw.monitorRunning = false  // Stop the monitor running
-	log.SetOutput(lfw.fallback) // Restore the log writer so all future Writes to log do not go via this LFWriter
-	if lfw.file == nil {
-		return
-	}
-	if lfw.file != nil { // If the file exists then close it
-		err := lfw.file.Close() // Close and report errors to fallback writer via log
-		lfw.file = nil          // Ensure file is null
-		if err != nil {
-			log.Printf("Failed to close log file %s. Fallback is active. Error:%e", lfw.currentName, err)
-		}
-	}
+	lfw.use = USE_NONE
+	lfw.monitorRunning = false // Stop the monitor running
+	lfw.file1.close()
+	lfw.file2.close()
 }
 
 //
@@ -69,26 +144,13 @@ func (lfw *LFWriter) CloseLogWriter() {
 func (lfw *LFWriter) Write(b []byte) (n int, err error) {
 	lfw.lock.Lock()
 	defer lfw.lock.Unlock()
-
-	if lfw.file == nil {
-		fileName := _deriveNameForLogWriter(lfw.fileMask)
-		logFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-		if strings.Contains(string(b), "application/json") {
-			err = fmt.Errorf("rouge error")
-		}
-		if err != nil {
-			log.SetOutput(lfw.fallback)                                                // Restore log writer
-			written, _ := lfw.fallback.Write(b)                                        // log the line
-			log.Printf("Failed to create log file %s. Error:%e", lfw.currentName, err) // log the error
-			return written, err
-		}
-		lfw.file = logFile // Set the file and start the monitor thread
-		lfw.currentName = fileName
-		if !lfw.monitorRunning {
-			lfw.startMonitor()
-		}
+	switch lfw.use {
+	case USE_F1:
+		return lfw.file1.write(b)
+	case USE_F2:
+		return lfw.file2.write(b)
 	}
-	return lfw.file.Write(b) // Write to the file
+	return os.Stderr.Write(b)
 }
 
 //
@@ -102,18 +164,28 @@ func (lfw *LFWriter) startMonitor() {
 	lfw.monitorRunning = true
 	go func() {
 		for lfw.monitorRunning {
-			fmt.Println("Ping:")
-			time.Sleep(lfw.delay)
 			newName := _deriveNameForLogWriter(lfw.fileMask)
-			if newName != lfw.currentName {
-				if lfw.file != nil {
-					lfw.file.Close() // Cannot do anything here if an error occurs!
-					lfw.file = nil
+			switch lfw.use {
+			case USE_F1:
+				if lfw.file1.requiresChange(newName) {
+					// Start using file 2
+					err := lfw.file2.open(newName)
+					if err == nil {
+						lfw.use = USE_F2
+						lfw.file1.close()
+					}
 				}
-				lfw.monitorRunning = false
-				lfw.currentName = newName
-				fmt.Printf("File name change : %s\n", lfw.currentName)
+			case USE_F2:
+				if lfw.file2.requiresChange(newName) {
+					// Start using file1
+					err := lfw.file1.open(newName)
+					if err == nil {
+						lfw.use = USE_F1
+						lfw.file2.close()
+					}
+				}
 			}
+			time.Sleep(lfw.monitorDelay)
 		}
 	}()
 }
