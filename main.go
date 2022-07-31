@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/liujiawm/graphics-go/graphics"
@@ -48,90 +47,6 @@ const (
 	HELP_HINT = ". Use 'help' option to view usage"
 )
 
-type LFWriter struct {
-	file        *os.File
-	currentName string
-	fileMask    string
-	lock        sync.Mutex
-	running     bool
-	delay       time.Duration
-}
-
-func NewLFWriter(fileMask string, delaySec uint) (*LFWriter, error) {
-	if delaySec < 5 {
-		return nil, fmt.Errorf("log rotation check must be above 5 seconds")
-	}
-	lfw := &LFWriter{fileMask: fileMask, currentName: "", file: nil, delay: time.Duration(delaySec * uint(time.Second)), running: false}
-	err := lfw.initWriter()
-	if err != nil {
-		return nil, err
-	}
-	go lfw.startTimeCheck()
-	return lfw, nil
-}
-
-func (lfw *LFWriter) Write(b []byte) (n int, err error) {
-	lfw.lock.Lock()
-	defer lfw.lock.Unlock()
-	return lfw.file.Write(b)
-}
-
-func (lfw *LFWriter) CloseLogWriter() {
-	lfw.running = false
-	lfw.file.Close()
-	lfw.file = nil
-}
-
-func (lfw *LFWriter) startTimeCheck() {
-	lfw.running = true
-	go func() {
-		for lfw.running {
-			time.Sleep(lfw.delay)
-			newName := lfw.deriveName()
-			if newName != lfw.currentName {
-				lfw.initWriter()
-			}
-		}
-	}()
-}
-
-func (lfw *LFWriter) initWriter() error {
-	lfw.lock.Lock()
-	defer lfw.lock.Unlock()
-
-	newName := lfw.deriveName()
-	if lfw.file != nil {
-		if newName == lfw.currentName {
-			return nil
-		}
-	}
-
-	if lfw.file != nil {
-		err := lfw.file.Close()
-		lfw.file = nil
-		if err != nil {
-			return err
-		}
-	}
-
-	logFile, err := os.OpenFile(newName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	lfw.currentName = newName
-	lfw.file = logFile
-	return nil
-}
-
-func (lfw *LFWriter) deriveName() string {
-	t := time.Now()
-	lfn := strings.ReplaceAll(lfw.fileMask, "%y", fmt.Sprintf("%d", t.Year()))
-	lfn = strings.ReplaceAll(lfn, "%d", fmt.Sprintf("%d", t.YearDay()))
-	lfn = strings.ReplaceAll(lfn, "%h", fmt.Sprintf("%d", t.Hour()))
-	lfn = strings.ReplaceAll(lfn, "%m", fmt.Sprintf("%d", t.Minute()))
-	return lfn
-}
-
 func main() {
 
 	if findBoolArg(HELP_ARG, true) {
@@ -165,7 +80,7 @@ func main() {
 
 	logFile := findStringArg(LOG_FILE_ARG, "")
 	if logFile != "" {
-		logFileWriter, err = NewLFWriter(logFile, 60)
+		logFileWriter, err = NewLFWriter(logFile, 20)
 		if err != nil {
 			log.Fatalf("Could not create timed log file. Name:%s Error:%e%s", logFile, err, HELP_HINT)
 		}
